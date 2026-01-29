@@ -14,3 +14,21 @@ body {
 #root {
   min-height: 100vh;
 }
+
+/* Shared modal overlay spacing so content doesn't touch viewport edges */
+.modal-overlay {
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
+@media (max-width: 640px) {
+  .modal-overlay {
+    padding: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .modal-overlay {
+    padding: 0.5rem;
+  }
+}

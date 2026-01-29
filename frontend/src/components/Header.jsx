@@ -1,6 +1,6 @@
 import './Header.css'
 
-export function Header({ user, onLoginClick, onLogout, onDeletedUsersClick }) {
+export function Header({ user, onLoginClick, onLogout, onDeletedItemsClick }) {
   return (
     <header className="header">
       <div className="header-title">AnhBi User Management</div>
@@ -9,8 +9,8 @@ export function Header({ user, onLoginClick, onLogout, onDeletedUsersClick }) {
         {user ? (
           <>
             {user.is_admin && (
-              <button className="btn-deleted-users" onClick={onDeletedUsersClick}>
-                Deleted Users
+              <button className="btn-deleted-items" onClick={onDeletedItemsClick}>
+                Deleted Items
               </button>
             )}
             <span className="user-name">{user.username}</span>

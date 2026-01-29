@@ -4,21 +4,29 @@ import { Header } from './components/Header'
 import { LoginModal } from './components/LoginModal'
 import { UserDetailModal } from './components/UserDetailModal'
 import { AddUserModal } from './components/AddUserModal'
-import { DeletedUsersModal } from './components/DeletedUsersModal'
+import { DeletedItemsModal } from './components/DeletedItemsModal'
+import { ManageDepartmentsModal } from './components/ManageDepartmentsModal'
 import './App.css'
 
 function App() {
   const { user, loading: authLoading, login, logout, getToken } = useAuth()
   const [departments, setDepartments] = useState([])
   const [users, setUsers] = useState([])
-  const [selectedDepartment, setSelectedDepartment] = useState(null)
+  // { type: 'department', id, name } | { type: 'sub', id, name, departmentName } | null (all)
+  const [selectedFilter, setSelectedFilter] = useState(null)
+  // Department dropdowns: closed by default. Set of department ids that are expanded.
+  const [expandedDepartmentIds, setExpandedDepartmentIds] = useState(new Set())
   const [loading, setLoading] = useState(true)
+  const [usersLoading, setUsersLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [usersError, setUsersError] = useState(null)
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [selectedUserId, setSelectedUserId] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [departmentSearchQuery, setDepartmentSearchQuery] = useState('')
   const [showAddUserModal, setShowAddUserModal] = useState(false)
-  const [showDeletedUsersModal, setShowDeletedUsersModal] = useState(false)
+  const [showDeletedItemsModal, setShowDeletedItemsModal] = useState(false)
+  const [showManageDepartmentsModal, setShowManageDepartmentsModal] = useState(false)
 
   // Fuzzy match function - checks if query chars appear in order in target
   const fuzzyMatch = (query, target) => {
@@ -34,6 +42,14 @@ function App() {
     }
     return qi === q.length
   }
+
+  // Fuzzy filter departments/sub-departments by name for sidebar
+  const departmentMatchesSearch = (dept) => {
+    if (!departmentSearchQuery.trim()) return true
+    if (fuzzyMatch(departmentSearchQuery, dept.name)) return true
+    return (dept.sub_departments || []).some((sub) => fuzzyMatch(departmentSearchQuery, sub.name))
+  }
+  const filteredDepartments = departments.filter(departmentMatchesSearch)
 
   // Check if user matches search query
   const matchesSearch = (u) => {
@@ -51,29 +67,17 @@ function App() {
   }
 
   useEffect(() => {
-    fetchData()
+    fetchDepartments()
   }, [])
 
-  const fetchData = async () => {
+  const fetchDepartments = async () => {
     setLoading(true)
     setError(null)
     try {
-      const [deptRes, usersRes] = await Promise.all([
-        fetch('/api/departments'),
-        fetch('/api/users')
-      ])
-      
-      if (!deptRes.ok || !usersRes.ok) {
-        throw new Error('Failed to fetch data')
-      }
-      
-      const [deptData, usersData] = await Promise.all([
-        deptRes.json(),
-        usersRes.json()
-      ])
-      
-      setDepartments(deptData)
-      setUsers(usersData)
+      const res = await fetch('/api/departments')
+      if (!res.ok) throw new Error('Failed to fetch departments')
+      const data = await res.json()
+      setDepartments(data)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -81,40 +85,87 @@ function App() {
     }
   }
 
-  // Filter by department first, then by search query
-  const filteredUsers = users
-    .filter(u => !selectedDepartment || u.department === selectedDepartment)
-    .filter(matchesSearch)
-
-  // Compute department user counts from current users array
-  const departmentCounts = users.reduce((acc, u) => {
-    if (u.department) {
-      acc[u.department] = (acc[u.department] || 0) + 1
+  const fetchUsersForFilter = async (filter) => {
+    setUsersLoading(true)
+    setUsersError(null)
+    try {
+      let url = '/api/users'
+      if (filter?.type === 'department') {
+        url += `?department_id=${filter.id}`
+      } else if (filter?.type === 'sub') {
+        url += `?sub_department_id=${filter.id}`
+      }
+      const res = await fetch(url)
+      if (!res.ok) throw new Error('Failed to fetch users')
+      const data = await res.json()
+      setUsers(data)
+    } catch (err) {
+      setUsersError(err.message)
+      setUsers([])
+    } finally {
+      setUsersLoading(false)
     }
-    return acc
-  }, {})
+  }
+
+  // Auto-expand departments when search matches a sub-department name
+  useEffect(() => {
+    if (!departmentSearchQuery.trim()) return
+    const toExpand = new Set()
+    departments.forEach((dept) => {
+      const subMatches = (dept.sub_departments || []).some((sub) =>
+        fuzzyMatch(departmentSearchQuery, sub.name)
+      )
+      if (subMatches) toExpand.add(dept.id)
+    })
+    if (toExpand.size > 0) {
+      setExpandedDepartmentIds((prev) => new Set([...prev, ...toExpand]))
+    }
+  }, [departmentSearchQuery, departments])
+
+  const fetchData = async () => {
+    await fetchDepartments()
+    if (selectedFilter !== null) {
+      await fetchUsersForFilter(selectedFilter)
+    }
+  }
+
+  // Filter by department/sub_department or all, then by search query
+  const filteredUsers = users.filter((u) => {
+    if (!selectedFilter) return true
+    if (selectedFilter.type === 'department') {
+      return u.effective_department === selectedFilter.name
+    }
+    if (selectedFilter.type === 'sub') {
+      return u.sub_department_id === selectedFilter.id
+    }
+    return true
+  }).filter(matchesSearch)
 
   const handleUserUpdate = (updatedUser) => {
     setUsers(users.map(u => u.id === updatedUser.id ? updatedUser : u))
   }
 
-  const handleUserCreated = (newUser) => {
-    setUsers([...users, newUser])
+  const handleUserCreated = () => {
+    fetchUsersForFilter(selectedFilter)
   }
 
   const handleUserDelete = (userId) => {
     setUsers(users.filter(u => u.id !== userId))
   }
 
-  const handleUserRestore = (restoredUser) => {
-    setUsers([...users, restoredUser])
+  const handleUserRestore = () => {
+    fetchUsersForFilter(selectedFilter)
   }
 
-  // Get department ID from selected department name
-  const getSelectedDepartmentId = () => {
-    if (!selectedDepartment) return null
-    const dept = departments.find(d => d.name === selectedDepartment)
-    return dept ? dept.id : null
+  // Get default department/sub for Add User when a filter is selected
+  const getDefaultDepartmentId = () => {
+    if (!selectedFilter) return null
+    if (selectedFilter.type === 'department') return selectedFilter.id
+    return null
+  }
+  const getDefaultSubDepartmentId = () => {
+    if (selectedFilter?.type === 'sub') return selectedFilter.id
+    return null
   }
 
   // Helper to get display name
@@ -135,7 +186,7 @@ function App() {
         user={user} 
         onLoginClick={() => setShowLoginModal(true)} 
         onLogout={logout}
-        onDeletedUsersClick={() => setShowDeletedUsersModal(true)}
+        onDeletedItemsClick={() => setShowDeletedItemsModal(true)}
       />
 
       {showLoginModal && (
@@ -160,54 +211,189 @@ function App() {
       {showAddUserModal && (
         <AddUserModal
           departments={departments}
-          defaultDepartmentId={getSelectedDepartmentId()}
+          defaultDepartmentId={getDefaultDepartmentId()}
+          defaultSubDepartmentId={getDefaultSubDepartmentId()}
           token={getToken()}
           onClose={() => setShowAddUserModal(false)}
           onUserCreated={handleUserCreated}
         />
       )}
 
-      {showDeletedUsersModal && (
-        <DeletedUsersModal
+      {showDeletedItemsModal && (
+        <DeletedItemsModal
           token={getToken()}
-          onClose={() => setShowDeletedUsersModal(false)}
-          onRestore={handleUserRestore}
+          onClose={() => setShowDeletedItemsModal(false)}
+          onRestoreUser={handleUserRestore}
+          onRestoreDepartment={fetchDepartments}
+          onRestoreSubDepartment={fetchDepartments}
+        />
+      )}
+
+      {showManageDepartmentsModal && (
+        <ManageDepartmentsModal
+          token={getToken()}
+          onClose={() => setShowManageDepartmentsModal(false)}
+          onSaved={fetchData}
         />
       )}
 
       <div className="layout">
         <aside className="sidebar">
           <h2>Departments</h2>
-          <ul className="department-list">
-            <li
-              className={selectedDepartment === null ? 'active' : ''}
-              onClick={() => setSelectedDepartment(null)}
-            >
-              All Departments
-            </li>
-            {departments.map((dept) => (
-              <li
-                key={dept.id}
-                className={selectedDepartment === dept.name ? 'active' : ''}
-                onClick={() => setSelectedDepartment(dept.name)}
+          <div className="sidebar-dept-search">
+            <input
+              type="text"
+              placeholder="Search departments..."
+              value={departmentSearchQuery}
+              onChange={(e) => setDepartmentSearchQuery(e.target.value)}
+              className="sidebar-search-input"
+            />
+            {departmentSearchQuery && (
+              <button
+                type="button"
+                className="sidebar-search-clear"
+                onClick={() => setDepartmentSearchQuery('')}
+                aria-label="Clear"
               >
-                {dept.name}
-                <span className="user-count">{departmentCounts[dept.name] || 0}</span>
-              </li>
-            ))}
+                &times;
+              </button>
+            )}
+          </div>
+          <ul className="department-list">
+            <li>
+              <div
+                className={`department-item ${!selectedFilter ? 'active' : ''}`}
+                onClick={() => setSelectedFilter(null)}
+              >
+                All Departments
+                <span className="user-count">
+                  {departments.reduce((sum, d) => sum + (d.user_count ?? 0), 0)}
+                </span>
+              </div>
+            </li>
+            {filteredDepartments.map((dept) => {
+              const isExpanded = expandedDepartmentIds.has(dept.id)
+              const hasSubDepts = (dept.sub_departments?.length ?? 0) > 0
+              const isDeptSelected = selectedFilter?.type === 'department' && selectedFilter?.id === dept.id
+              return (
+                <li key={`dept-${dept.id}`}>
+                  <div
+                    className={`department-item department-dropdown-trigger ${hasSubDepts ? 'has-children' : ''} ${isExpanded ? 'expanded' : ''} ${isDeptSelected ? 'active' : ''}`}
+                    onClick={() => {
+                      setSelectedFilter({ type: 'department', id: dept.id, name: dept.name })
+                      fetchUsersForFilter({ type: 'department', id: dept.id, name: dept.name })
+                      if (hasSubDepts) {
+                        setExpandedDepartmentIds((prev) => {
+                          const next = new Set(prev)
+                          if (!next.has(dept.id)) next.add(dept.id)
+                          return next
+                        })
+                      }
+                    }}
+                  >
+                    <span className="department-label">
+                      {hasSubDepts && (
+                        <span className="department-chevron" aria-hidden>
+                          {isExpanded ? '▼' : '▶'}
+                        </span>
+                      )}
+                      {dept.name}
+                    </span>
+                    <span className="user-count">{dept.user_count ?? 0}</span>
+                  </div>
+                  {hasSubDepts && (
+                    <ul className={`sub-department-list ${isExpanded ? 'is-open' : ''}`}>
+                      {dept.sub_departments.map((sub) => (
+                        <li
+                          key={`sub-${sub.id}`}
+                          className={selectedFilter?.type === 'sub' && selectedFilter?.id === sub.id ? 'active' : ''}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            const filter = { type: 'sub', id: sub.id, name: sub.name, departmentName: dept.name }
+                            setSelectedFilter(filter)
+                            fetchUsersForFilter(filter)
+                          }}
+                        >
+                          {sub.name}
+                          <span className="user-count">{sub.user_count ?? 0}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              )
+            })}
           </ul>
+          {user?.is_admin && (
+            <button
+              type="button"
+              className="sidebar-add-dept-btn"
+              onClick={() => setShowManageDepartmentsModal(true)}
+            >
+              Manage department
+            </button>
+          )}
         </aside>
 
         <main className="main-content">
           {loading ? (
-            <p>Loading data...</p>
+            <p>Loading departments...</p>
           ) : error ? (
             <p className="error-text">Error: {error}</p>
+          ) : !selectedFilter ? (
+            <>
+              <div className="content-header">
+                <h1>Departments &amp; Sub-departments</h1>
+              </div>
+              <div className="departments-overview">
+                {filteredDepartments.map((dept) => (
+                  <div key={dept.id} className="department-overview-card">
+                    <div
+                      className="department-overview-header department-overview-clickable"
+                      onClick={() => {
+                        setSelectedFilter({ type: 'department', id: dept.id, name: dept.name })
+                        fetchUsersForFilter({ type: 'department', id: dept.id, name: dept.name })
+                        if ((dept.sub_departments?.length ?? 0) > 0) {
+                          setExpandedDepartmentIds((prev) => new Set([...prev, dept.id]))
+                        }
+                      }}
+                    >
+                      <span className="department-overview-name">{dept.name}</span>
+                      <span className="department-overview-count">{dept.user_count ?? 0} users</span>
+                    </div>
+                    {dept.description && (
+                      <p className="department-overview-desc">{dept.description}</p>
+                    )}
+                    {(dept.sub_departments?.length ?? 0) > 0 && (
+                      <ul className="department-overview-subs">
+                        {dept.sub_departments.map((sub) => (
+                          <li
+                            key={sub.id}
+                            className="department-overview-sub-clickable"
+                            onClick={() => {
+                              const filter = { type: 'sub', id: sub.id, name: sub.name, departmentName: dept.name }
+                              setSelectedFilter(filter)
+                              fetchUsersForFilter(filter)
+                              setExpandedDepartmentIds((prev) => new Set([...prev, dept.id]))
+                            }}
+                          >
+                            — {sub.name}
+                            <span className="department-overview-sub-count">{sub.user_count ?? 0} users</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
           ) : (
             <>
               <div className="content-header">
                 <h1>
-                  {selectedDepartment ? `${selectedDepartment} Users` : 'All Users'}
+                  {selectedFilter.type === 'sub'
+                    ? `${selectedFilter.name} (${selectedFilter.departmentName}) Users`
+                    : `${selectedFilter.name} Users`}
                 </h1>
                 <div className="header-actions">
                   <div className="search-box">
@@ -220,6 +406,7 @@ function App() {
                     />
                     {searchQuery && (
                       <button 
+                        type="button"
                         className="search-clear"
                         onClick={() => setSearchQuery('')}
                       >
@@ -238,7 +425,11 @@ function App() {
                 </div>
               </div>
               
-              {filteredUsers.length === 0 ? (
+              {usersLoading ? (
+                <p className="no-users">Loading users...</p>
+              ) : usersError ? (
+                <p className="error-text">Error loading users: {usersError}</p>
+              ) : filteredUsers.length === 0 ? (
                 <p className="no-users">No users found</p>
               ) : (
                 <div className="user-grid">
@@ -270,7 +461,11 @@ function App() {
                           </div>
                           <div className="tooltip-row">
                             <span className="tooltip-label">Department:</span>
-                            <span>{u.department || '-'}</span>
+                            <span>
+                              {u.sub_department
+                                ? `${u.sub_department} (${u.effective_department})`
+                                : (u.effective_department || u.department || '-')}
+                            </span>
                           </div>
                           <div className="tooltip-row">
                             <span className="tooltip-label">Role:</span>

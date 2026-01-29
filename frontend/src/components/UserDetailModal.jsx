@@ -13,13 +13,13 @@ export function UserDetailModal({ userId, departments, isAdmin, token, onClose, 
   // Original values to detect changes
   const [originalValues, setOriginalValues] = useState(null)
   
-  // Form state
+  // Form state: "dept-1" or "sub-2" for department/sub_department
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [profileImg, setProfileImg] = useState('')
-  const [departmentId, setDepartmentId] = useState('')
+  const [departmentOrSub, setDepartmentOrSub] = useState('')
 
   useEffect(() => {
     fetchUser()
@@ -39,8 +39,13 @@ export function UserDetailModal({ userId, departments, isAdmin, token, onClose, 
       setFirstName(data.first_name || '')
       setLastName(data.last_name || '')
       setProfileImg(data.profile_img || '')
-      setDepartmentId(data.department_id || '')
-      
+      const place = data.sub_department_id
+        ? `sub-${data.sub_department_id}`
+        : data.department_id
+          ? `dept-${data.department_id}`
+          : ''
+      setDepartmentOrSub(place)
+
       // Store original values for change detection
       setOriginalValues({
         username: data.username,
@@ -48,7 +53,7 @@ export function UserDetailModal({ userId, departments, isAdmin, token, onClose, 
         firstName: data.first_name || '',
         lastName: data.last_name || '',
         profileImg: data.profile_img || '',
-        departmentId: data.department_id || ''
+        departmentOrSub: place
       })
     } catch (err) {
       setError(err.message)
@@ -66,7 +71,7 @@ export function UserDetailModal({ userId, departments, isAdmin, token, onClose, 
       firstName !== originalValues.firstName ||
       lastName !== originalValues.lastName ||
       profileImg !== originalValues.profileImg ||
-      String(departmentId) !== String(originalValues.departmentId)
+      departmentOrSub !== originalValues.departmentOrSub
     )
   }
 
@@ -92,6 +97,12 @@ export function UserDetailModal({ userId, departments, isAdmin, token, onClose, 
     setSaving(true)
     setError(null)
     try {
+      const [departmentId, subDepartmentId] = departmentOrSub.startsWith('sub-')
+        ? [null, parseInt(departmentOrSub.slice(4), 10)]
+        : departmentOrSub.startsWith('dept-')
+          ? [parseInt(departmentOrSub.slice(5), 10), null]
+          : [null, null]
+
       const response = await fetch(`/api/users/${userId}`, {
         method: 'PUT',
         headers: {
@@ -104,7 +115,8 @@ export function UserDetailModal({ userId, departments, isAdmin, token, onClose, 
           first_name: firstName || null,
           last_name: lastName || null,
           profile_img: profileImg || null,
-          department_id: departmentId ? parseInt(departmentId) : null
+          department_id: departmentId,
+          sub_department_id: subDepartmentId
         })
       })
 
@@ -215,6 +227,21 @@ export function UserDetailModal({ userId, departments, isAdmin, token, onClose, 
           {user?.is_admin && <span className="admin-tag">Administrator</span>}
         </div>
 
+        {(user?.effective_department || user?.department) && (
+          <div className="user-department-display">
+            <div className="department-display-row">
+              <span className="department-display-label">Department:</span>
+              <span className="department-display-value">{user.effective_department || user.department}</span>
+            </div>
+            {user?.sub_department && (
+              <div className="department-display-row">
+                <span className="department-display-label">Sub-department:</span>
+                <span className="department-display-value">{user.sub_department}</span>
+              </div>
+            )}
+          </div>
+        )}
+
         {error && <p className="error-message">{error}</p>}
 
         <div className="form-row">
@@ -277,18 +304,25 @@ export function UserDetailModal({ userId, departments, isAdmin, token, onClose, 
         </div>
 
         <div className="form-group">
-          <label htmlFor="department">Department</label>
+          <label htmlFor="department">Department / Sub-department</label>
           <select
             id="department"
-            value={departmentId}
-            onChange={(e) => setDepartmentId(e.target.value)}
+            value={departmentOrSub}
+            onChange={(e) => setDepartmentOrSub(e.target.value)}
             disabled={!isAdmin}
           >
             <option value="">No Department</option>
             {departments.map((dept) => (
-              <option key={dept.id} value={dept.id}>
-                {dept.name}
-              </option>
+              <optgroup key={dept.id} label={dept.name}>
+                <option value={`dept-${dept.id}`}>
+                  {dept.name}
+                </option>
+                {(dept.sub_departments || []).map((sub) => (
+                  <option key={`sub-${sub.id}`} value={`sub-${sub.id}`}>
+                    — {sub.name}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </div>

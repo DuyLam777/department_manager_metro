@@ -6,7 +6,7 @@
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.75rem;
+  gap: 1rem;
 }
 
 .header-title {
@@ -57,30 +57,33 @@
   color: white;
 }
 
-.btn-deleted-users {
+.btn-deleted-items {
   background-color: #6b7280;
   color: white;
 }
 
-.btn-deleted-users:hover {
+.btn-deleted-items:hover {
   background-color: #4b5563;
 }
 
 /* Mobile responsive */
 @media (max-width: 640px) {
   .header {
-    padding: 0.75rem 1rem;
+    padding: 0.875rem 1rem;
+    gap: 0.75rem;
   }
 
   .header-title {
     font-size: 1rem;
     width: 100%;
     text-align: center;
+    margin: 0;
   }
 
   .header-actions {
     width: 100%;
     justify-content: center;
+    gap: 0.5rem;
   }
 
   .user-name {
@@ -89,8 +92,20 @@
 
   .btn-login-header,
   .btn-logout,
-  .btn-deleted-users {
+  .btn-deleted-items {
     padding: 0.5rem 0.75rem;
     font-size: 0.8rem;
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 480px) {
+  .header {
+    padding: 0.75rem 0.875rem;
+  }
+
+  .header-actions {
+    flex-wrap: wrap;
+    gap: 0.5rem;
   }
 }

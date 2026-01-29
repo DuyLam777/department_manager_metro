@@ -52,6 +52,38 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
     )
 
 
+def get_current_user_optional(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db),
+):
+    """Get current user if authenticated; otherwise return None."""
+    if not credentials:
+        return None
+    payload = decode_token(credentials.credentials)
+    if not payload:
+        return None
+    user_id = payload.get("sub")
+    if not user_id:
+        return None
+    user = db.query(User).filter(User.id == int(user_id), User.deleted == False).first()
+    return user
+
+
+def require_admin(user=Depends(get_current_user_optional)):
+    """Dependency: require authenticated admin. Raise 403 if not admin or not logged in."""
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+        )
+    if not user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+    return user
+
+
 @router.get("/me")
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),

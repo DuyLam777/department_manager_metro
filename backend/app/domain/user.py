@@ -21,8 +21,11 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    # Foreign key: each user belongs to one department
+    # Foreign key: user belongs to one department (direct) OR one sub_department
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
+    sub_department_id = Column(Integer, ForeignKey("sub_departments.id"), nullable=True)
 
-    # Relationship: user belongs to one department
+    # Relationship: user belongs to one department (when assigned directly)
     department = relationship("Department", back_populates="users")
+    # Relationship: user belongs to one sub_department (when assigned to sub)
+    sub_department = relationship("SubDepartment", back_populates="users")

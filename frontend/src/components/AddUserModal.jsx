@@ -1,20 +1,18 @@
 import { useState } from 'react'
 import './AddUserModal.css'
 
-export function AddUserModal({ departments, defaultDepartmentId, token, onClose, onUserCreated }) {
+export function AddUserModal({ departments, defaultDepartmentId, defaultSubDepartmentId, token, onClose, onUserCreated }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [generatedPassword, setGeneratedPassword] = useState(null)
   
-  // Store initial department for change detection
-  const initialDepartmentId = defaultDepartmentId || ''
-  
-  // Form state
+  // Form state: one of department_id or sub_department_id (value like "dept-1" or "sub-2")
+  const initialPlace = defaultSubDepartmentId ? `sub-${defaultSubDepartmentId}` : (defaultDepartmentId ? `dept-${defaultDepartmentId}` : '')
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
-  const [departmentId, setDepartmentId] = useState(initialDepartmentId)
+  const [departmentOrSub, setDepartmentOrSub] = useState(initialPlace)
 
   // Check if form has any data entered
   const hasUnsavedChanges = () => {
@@ -23,7 +21,7 @@ export function AddUserModal({ departments, defaultDepartmentId, token, onClose,
       email.trim() !== '' ||
       firstName.trim() !== '' ||
       lastName.trim() !== '' ||
-      String(departmentId) !== String(initialDepartmentId)
+      departmentOrSub !== initialPlace
     )
   }
 
@@ -44,6 +42,12 @@ export function AddUserModal({ departments, defaultDepartmentId, token, onClose,
     setError(null)
     
     try {
+      const [departmentId, subDepartmentId] = departmentOrSub.startsWith('sub-')
+        ? [null, parseInt(departmentOrSub.slice(4), 10)]
+        : departmentOrSub.startsWith('dept-')
+          ? [parseInt(departmentOrSub.slice(5), 10), null]
+          : [null, null]
+
       const response = await fetch('/api/users', {
         method: 'POST',
         headers: {
@@ -55,7 +59,8 @@ export function AddUserModal({ departments, defaultDepartmentId, token, onClose,
           email: email || null,
           first_name: firstName || null,
           last_name: lastName || null,
-          department_id: departmentId ? parseInt(departmentId) : null
+          department_id: departmentId,
+          sub_department_id: subDepartmentId
         })
       })
 
@@ -83,9 +88,9 @@ export function AddUserModal({ departments, defaultDepartmentId, token, onClose,
     return (
       <div className="modal-overlay" onClick={onClose}>
         <div className="modal-content add-user-modal" onClick={(e) => e.stopPropagation()}>
-          <div className="modal-header">
+          <div className="add-user-modal-header">
             <h2>User Created Successfully</h2>
-            <button className="close-btn" onClick={onClose}>&times;</button>
+            <button type="button" className="add-user-close-btn" onClick={onClose} aria-label="Close">&times;</button>
           </div>
 
           <div className="success-content">
@@ -121,9 +126,9 @@ export function AddUserModal({ departments, defaultDepartmentId, token, onClose,
   return (
     <div className="modal-overlay" onClick={handleClose}>
       <div className="modal-content add-user-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
+        <div className="add-user-modal-header">
           <h2>Add New User</h2>
-          <button className="close-btn" onClick={handleClose}>&times;</button>
+          <button type="button" className="add-user-close-btn" onClick={handleClose} aria-label="Close">&times;</button>
         </div>
 
         {error && <p className="error-message">{error}</p>}
@@ -173,17 +178,24 @@ export function AddUserModal({ departments, defaultDepartmentId, token, onClose,
           </div>
 
           <div className="form-group">
-            <label htmlFor="department">Department</label>
+            <label htmlFor="department">Department / Sub-department</label>
             <select
               id="department"
-              value={departmentId}
-              onChange={(e) => setDepartmentId(e.target.value)}
+              value={departmentOrSub}
+              onChange={(e) => setDepartmentOrSub(e.target.value)}
             >
               <option value="">No Department</option>
               {departments.map((dept) => (
-                <option key={dept.id} value={dept.id}>
-                  {dept.name}
-                </option>
+                <optgroup key={dept.id} label={dept.name}>
+                  <option value={`dept-${dept.id}`}>
+                    {dept.name}
+                  </option>
+                  {(dept.sub_departments || []).map((sub) => (
+                    <option key={`sub-${sub.id}`} value={`sub-${sub.id}`}>
+                      — {sub.name}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </div>

@@ -5,8 +5,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config.database import engine, SessionLocal, Base
 from app.domain.department import Department  # noqa: F401 - needed for table creation
+from app.domain.sub_department import SubDepartment  # noqa: F401 - needed for table creation
 from app.domain.user import User  # noqa: F401 - needed for table creation
-from app.routes import users, departments, auth
+from app.routes import users, departments, sub_departments, auth
 from app.seed import seed_data
 
 
@@ -42,6 +43,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(departments.router)
+app.include_router(sub_departments.router)
 
 
 @app.get("/health")
