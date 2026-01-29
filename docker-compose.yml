@@ -1,0 +1,32 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: anhbi-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/data:/app/data
+    environment:
+      - DATABASE_URL=sqlite:///./data/anhbi.db
+    networks:
+      - anhbi-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: anhbi-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - anhbi-network
+    restart: unless-stopped
+
+networks:
+  anhbi-network:
+    driver: bridge

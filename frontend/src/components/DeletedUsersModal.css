@@ -1,0 +1,234 @@
+.deleted-users-modal {
+  max-width: 600px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-shrink: 0;
+}
+
+.modal-header h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 1.5rem;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 1.75rem;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.close-btn:hover {
+  color: #111827;
+}
+
+.modal-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background-color: #f9fafb;
+  border-radius: 0.5rem;
+  margin-bottom: 1rem;
+  flex-shrink: 0;
+}
+
+.user-count-info {
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+
+.btn-cleanup {
+  padding: 0.5rem 1rem;
+  background-color: #f59e0b;
+  color: white;
+  border: none;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-cleanup:hover:not(:disabled) {
+  background-color: #d97706;
+}
+
+.btn-cleanup:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.error-message {
+  color: #dc2626;
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+  padding: 0.5rem;
+  background-color: #fef2f2;
+  border-radius: 0.375rem;
+}
+
+.loading-text,
+.empty-text {
+  text-align: center;
+  color: #6b7280;
+  padding: 2rem;
+}
+
+.deleted-users-list {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.deleted-user-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  gap: 1rem;
+}
+
+.deleted-user-row:last-child {
+  border-bottom: none;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.user-avatar-small {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.user-details {
+  min-width: 0;
+}
+
+.user-name {
+  font-weight: 600;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-meta {
+  font-size: 0.8rem;
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.deleted-info {
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+.days-warning {
+  color: #dc2626;
+  font-weight: 500;
+}
+
+.user-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.btn-restore {
+  padding: 0.375rem 0.75rem;
+  background-color: #10b981;
+  color: white;
+  border: none;
+  border-radius: 0.375rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-restore:hover:not(:disabled) {
+  background-color: #059669;
+}
+
+.btn-perma-delete {
+  padding: 0.375rem 0.75rem;
+  background-color: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 0.375rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-perma-delete:hover:not(:disabled) {
+  background-color: #b91c1c;
+}
+
+.btn-restore:disabled,
+.btn-perma-delete:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+/* Mobile Responsive */
+@media (max-width: 480px) {
+  .deleted-users-modal {
+    max-width: 100%;
+    margin: 1rem;
+    max-height: 90vh;
+  }
+
+  .modal-header h2 {
+    font-size: 1.25rem;
+  }
+
+  .modal-toolbar {
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: stretch;
+  }
+
+  .user-count-info {
+    text-align: center;
+  }
+
+  .btn-cleanup {
+    width: 100%;
+  }
+
+  .deleted-user-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .user-actions {
+    justify-content: stretch;
+  }
+
+  .btn-restore,
+  .btn-perma-delete {
+    flex: 1;
+  }
+}

@@ -1,0 +1,50 @@
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.config.database import engine, SessionLocal, Base
+from app.domain.department import Department  # noqa: F401 - needed for table creation
+from app.domain.user import User  # noqa: F401 - needed for table creation
+from app.routes import users, departments, auth
+from app.seed import seed_data
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Create tables and seed data on startup."""
+    Base.metadata.create_all(bind=engine)
+    db = SessionLocal()
+    try:
+        seed_data(db)
+    finally:
+        db.close()
+    yield
+
+
+app = FastAPI(
+    title="AnhBi User Management API",
+    description="User management system with roles, relationships, and authentication",
+    version="0.1.0",
+    lifespan=lifespan,
+)
+
+# CORS for frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include routers
+app.include_router(auth.router)
+app.include_router(users.router)
+app.include_router(departments.router)
+
+
+@app.get("/health")
+def health_check():
+    """Health check endpoint."""
+    return {"status": "ok"}

@@ -1,0 +1,16 @@
+[project]
+name = "anhbi-backend"
+version = "0.1.0"
+description = "User management backend with FastAPI"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "sqlalchemy",
+    "pydantic",
+    "pydantic-settings",
+    "bcrypt",
+    "python-jose[cryptography]",
+    "python-multipart",
+]
