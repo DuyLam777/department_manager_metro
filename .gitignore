@@ -38,3 +38,6 @@ htmlcov/
 
 # uv
 .uv/
+
+# Claude
+.claude/
