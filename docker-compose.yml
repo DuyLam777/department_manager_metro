@@ -7,7 +7,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./backend/data:/app/data
+      - anhbi_db:/app/data
     environment:
       - DATABASE_URL=sqlite:///./data/anhbi.db
     networks:
@@ -30,3 +30,6 @@ services:
 networks:
   anhbi-network:
     driver: bridge
+
+volumes:
+  anhbi_db:

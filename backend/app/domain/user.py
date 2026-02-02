@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -15,6 +15,7 @@ class User(Base):
     last_name = Column(String, nullable=True)
     password_hash = Column(String, nullable=False)
     profile_img = Column(String, nullable=True)
+    position = Column(String, nullable=True)  # Chức vụ (position/title)
     is_admin = Column(Boolean, default=False)
     deleted = Column(Boolean, default=False)
     deleted_at = Column(DateTime(timezone=True), nullable=True)

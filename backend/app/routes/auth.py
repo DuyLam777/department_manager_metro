@@ -1,11 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.config.database import get_db
-from app.service.auth_service import authenticate_user, create_access_token, decode_token
 from app.domain.user import User
+from app.service.auth_service import (
+    authenticate_user,
+    create_access_token,
+    decode_token,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 security = HTTPBearer(auto_error=False)
@@ -26,29 +30,33 @@ class LoginResponse(BaseModel):
 def login(request: LoginRequest, db: Session = Depends(get_db)):
     """Login endpoint - only admins can login."""
     user = authenticate_user(db, request.username, request.password)
-    
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
         )
-    
+
     if not user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only admins can login",
         )
-    
-    access_token = create_access_token(data={"sub": str(user.id), "username": user.username})
-    
+
+    access_token = create_access_token(
+        data={"sub": str(user.id), "username": user.username}
+    )
+
     return LoginResponse(
         access_token=access_token,
         user={
             "id": user.id,
             "username": user.username,
             "email": user.email,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
             "is_admin": user.is_admin,
-        }
+        },
     )
 
 
@@ -87,7 +95,7 @@ def require_admin(user=Depends(get_current_user_optional)):
 @router.get("/me")
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Get current logged in user."""
     if not credentials:
@@ -95,26 +103,28 @@ def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated",
         )
-    
+
     payload = decode_token(credentials.credentials)
     if not payload:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
         )
-    
+
     user_id = payload.get("sub")
     user = db.query(User).filter(User.id == int(user_id), User.deleted == False).first()
-    
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found",
         )
-    
+
     return {
         "id": user.id,
         "username": user.username,
         "email": user.email,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
         "is_admin": user.is_admin,
     }

@@ -1,113 +1,127 @@
-import { useState, useEffect } from 'react'
-import './UserDetailModal.css'
+import { useState, useEffect } from "react";
+import { ImageCropModal } from "./ImageCropModal";
+import "./UserDetailModal.css";
 
-export function UserDetailModal({ userId, departments, isAdmin, token, onClose, onUpdate, onDelete }) {
-  const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [resetting, setResetting] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const [error, setError] = useState(null)
-  const [newPassword, setNewPassword] = useState(null)
-  
+export function UserDetailModal({
+  userId,
+  departments,
+  isAdmin,
+  token,
+  onClose,
+  onUpdate,
+  onDelete,
+}) {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState(null);
+  const [newPassword, setNewPassword] = useState(null);
+
   // Original values to detect changes
-  const [originalValues, setOriginalValues] = useState(null)
-  
+  const [originalValues, setOriginalValues] = useState(null);
+
   // Form state: "dept-1" or "sub-2" for department/sub_department
-  const [username, setUsername] = useState('')
-  const [email, setEmail] = useState('')
-  const [firstName, setFirstName] = useState('')
-  const [lastName, setLastName] = useState('')
-  const [profileImg, setProfileImg] = useState('')
-  const [departmentOrSub, setDepartmentOrSub] = useState('')
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [profileImg, setProfileImg] = useState("");
+  const [departmentOrSub, setDepartmentOrSub] = useState("");
+  const [position, setPosition] = useState("");
+  const [cropImageSrc, setCropImageSrc] = useState(null);
 
   useEffect(() => {
-    fetchUser()
-  }, [userId])
+    fetchUser();
+  }, [userId]);
 
   const fetchUser = async () => {
-    setLoading(true)
+    setLoading(true);
     try {
-      const response = await fetch(`/api/users/${userId}`)
-      if (!response.ok) throw new Error('Failed to fetch user')
-      const data = await response.json()
-      setUser(data)
-      
+      const response = await fetch(`/api/users/${userId}`);
+      if (!response.ok) throw new Error("Tải thông tin người dùng thất bại");
+      const data = await response.json();
+      setUser(data);
+
       // Set form values
-      setUsername(data.username)
-      setEmail(data.email || '')
-      setFirstName(data.first_name || '')
-      setLastName(data.last_name || '')
-      setProfileImg(data.profile_img || '')
+      setUsername(data.username);
+      setEmail(data.email || "");
+      setFirstName(data.first_name || "");
+      setLastName(data.last_name || "");
+      setProfileImg(data.profile_img || "");
+      setPosition(data.position || "");
       const place = data.sub_department_id
         ? `sub-${data.sub_department_id}`
         : data.department_id
           ? `dept-${data.department_id}`
-          : ''
-      setDepartmentOrSub(place)
+          : "";
+      setDepartmentOrSub(place);
 
       // Store original values for change detection
       setOriginalValues({
         username: data.username,
-        email: data.email || '',
-        firstName: data.first_name || '',
-        lastName: data.last_name || '',
-        profileImg: data.profile_img || '',
-        departmentOrSub: place
-      })
+        email: data.email || "",
+        firstName: data.first_name || "",
+        lastName: data.last_name || "",
+        profileImg: data.profile_img || "",
+        departmentOrSub: place,
+        position: data.position || "",
+      });
     } catch (err) {
-      setError(err.message)
+      setError(err.message);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   // Check if form has unsaved changes
   const hasUnsavedChanges = () => {
-    if (!originalValues || !isAdmin) return false
+    if (!originalValues || !isAdmin) return false;
     return (
       username !== originalValues.username ||
       email !== originalValues.email ||
       firstName !== originalValues.firstName ||
       lastName !== originalValues.lastName ||
       profileImg !== originalValues.profileImg ||
-      departmentOrSub !== originalValues.departmentOrSub
-    )
-  }
+      departmentOrSub !== originalValues.departmentOrSub ||
+      position !== originalValues.position
+    );
+  };
 
   // Handle close with unsaved changes check
   const handleClose = () => {
     if (hasUnsavedChanges()) {
-      if (confirm('You have unsaved changes. Discard them?')) {
-        onClose()
+      if (confirm("Bạn có thay đổi chưa lưu. Bỏ chúng?")) {
+        onClose();
       }
     } else {
-      onClose()
+      onClose();
     }
-  }
+  };
 
   const getDisplayName = () => {
     if (firstName || lastName) {
-      return `${firstName} ${lastName}`.trim()
+      return `${firstName} ${lastName}`.trim();
     }
-    return username
-  }
+    return username;
+  };
 
   const handleSave = async () => {
-    setSaving(true)
-    setError(null)
+    setSaving(true);
+    setError(null);
     try {
-      const [departmentId, subDepartmentId] = departmentOrSub.startsWith('sub-')
+      const [departmentId, subDepartmentId] = departmentOrSub.startsWith("sub-")
         ? [null, parseInt(departmentOrSub.slice(4), 10)]
-        : departmentOrSub.startsWith('dept-')
+        : departmentOrSub.startsWith("dept-")
           ? [parseInt(departmentOrSub.slice(5), 10), null]
-          : [null, null]
+          : [null, null];
 
       const response = await fetch(`/api/users/${userId}`, {
-        method: 'PUT',
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           username,
@@ -116,129 +130,180 @@ export function UserDetailModal({ userId, departments, isAdmin, token, onClose, 
           last_name: lastName || null,
           profile_img: profileImg || null,
           department_id: departmentId,
-          sub_department_id: subDepartmentId
-        })
-      })
+          sub_department_id: subDepartmentId,
+          position: position || null,
+        }),
+      });
 
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.detail || 'Failed to update user')
+        const data = await response.json();
+        throw new Error(data.detail || "Cập nhật người dùng thất bại");
       }
 
-      const updatedUser = await response.json()
-      onUpdate(updatedUser)
-      onClose()
+      const updatedUser = await response.json();
+      onUpdate(updatedUser);
+      onClose();
     } catch (err) {
-      setError(err.message)
+      setError(err.message);
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
-  }
+  };
 
   const handleResetPassword = async () => {
-    if (!confirm(`Are you sure you want to reset the password for ${username}?`)) {
-      return
+    if (!confirm(`Bạn có chắc muốn đặt lại mật khẩu cho ${username}?`)) {
+      return;
     }
-    
-    setResetting(true)
-    setError(null)
+
+    setResetting(true);
+    setError(null);
     try {
       const response = await fetch(`/api/users/${userId}/reset-password`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.detail || 'Failed to reset password')
+        const data = await response.json();
+        throw new Error(data.detail || "Đặt lại mật khẩu thất bại");
       }
 
-      const result = await response.json()
-      setNewPassword(result.new_password)
+      const result = await response.json();
+      setNewPassword(result.new_password);
     } catch (err) {
-      setError(err.message)
+      setError(err.message);
     } finally {
-      setResetting(false)
+      setResetting(false);
     }
-  }
+  };
 
   const copyPassword = () => {
-    navigator.clipboard.writeText(newPassword)
-  }
+    navigator.clipboard.writeText(newPassword);
+  };
 
   const handleDelete = async () => {
-    const displayName = getDisplayName()
-    if (!confirm(`Are you sure you want to delete ${displayName}? This action cannot be undone.`)) {
-      return
+    const displayName = getDisplayName();
+    if (
+      !confirm(
+        `Bạn có chắc muốn xóa ${displayName}? Hành động này không thể hoàn tác.`,
+      )
+    ) {
+      return;
     }
-    
-    setDeleting(true)
-    setError(null)
+
+    setDeleting(true);
+    setError(null);
     try {
       const response = await fetch(`/api/users/${userId}`, {
-        method: 'DELETE',
+        method: "DELETE",
         headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.detail || 'Failed to delete user')
+        const data = await response.json();
+        throw new Error(data.detail || "Xóa người dùng thất bại");
       }
 
-      onDelete(userId)
-      onClose()
+      onDelete(userId);
+      onClose();
     } catch (err) {
-      setError(err.message)
+      setError(err.message);
     } finally {
-      setDeleting(false)
+      setDeleting(false);
     }
-  }
+  };
 
   if (loading) {
     return (
       <div className="modal-overlay" onClick={handleClose}>
-        <div className="modal-content user-detail-modal" onClick={(e) => e.stopPropagation()}>
-          <p>Loading...</p>
+        <div
+          className="modal-content user-detail-modal"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <p>Đang tải...</p>
         </div>
       </div>
-    )
+    );
   }
 
-  const displayName = getDisplayName()
+  const displayName = getDisplayName();
 
   return (
     <div className="modal-overlay" onClick={handleClose}>
-      <div className="modal-content user-detail-modal" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="modal-content user-detail-modal"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="modal-header">
-          <h2>{isAdmin ? 'Edit User' : 'User Details'}</h2>
-          <button className="close-btn" onClick={handleClose}>&times;</button>
+          <h2>{isAdmin ? "Chỉnh sửa người dùng" : "Chi tiết người dùng"}</h2>
+          <button className="close-btn" onClick={handleClose}>
+            &times;
+          </button>
         </div>
 
         <div className="user-profile-section">
-          <img 
-            src={profileImg || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=6b7280&color=fff&size=128`}
-            alt={displayName}
-            className="profile-preview"
-          />
-          {user?.is_admin && <span className="admin-tag">Administrator</span>}
+          <div className="profile-img-wrapper">
+            <img
+              src={
+                profileImg ||
+                `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=6b7280&color=fff&size=128`
+              }
+              alt={displayName}
+              className="profile-preview"
+            />
+            {isAdmin && (
+              <label className="profile-upload-overlay" title="Tải ảnh hồ sơ">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="profile-upload-input"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = () => setCropImageSrc(reader.result);
+                    reader.readAsDataURL(file);
+                    e.target.value = "";
+                  }}
+                />
+                <span className="profile-upload-icon">&#x1F4F7;</span>
+              </label>
+            )}
+          </div>
+          {user?.is_admin && <span className="admin-tag">Quản trị viên</span>}
         </div>
 
-        {(user?.effective_department || user?.department) && (
+        {(user?.effective_department || user?.department || user?.position) && (
           <div className="user-department-display">
             <div className="department-display-row">
-              <span className="department-display-label">Department:</span>
-              <span className="department-display-value">{user.effective_department || user.department}</span>
+              <span className="department-display-label">Bộ phận:</span>
+              <span className="department-display-value">
+                {user.effective_bo_phan ||
+                  user.effective_department ||
+                  user.department ||
+                  user.bo_phan ||
+                  "-"}
+              </span>
             </div>
             {user?.sub_department && (
               <div className="department-display-row">
-                <span className="department-display-label">Sub-department:</span>
-                <span className="department-display-value">{user.sub_department}</span>
+                <span className="department-display-label">Ban:</span>
+                <span className="department-display-value">
+                  {user.sub_department}
+                </span>
               </div>
             )}
+            <div className="department-display-row">
+              <span className="department-display-label">Chức vụ:</span>
+              <span className="department-display-value">
+                {user.position ||
+                  (user.is_admin ? "Quản trị viên" : "Người dùng")}
+              </span>
+            </div>
           </div>
         )}
 
@@ -246,7 +311,7 @@ export function UserDetailModal({ userId, departments, isAdmin, token, onClose, 
 
         <div className="form-row">
           <div className="form-group">
-            <label htmlFor="firstName">First Name</label>
+            <label htmlFor="firstName">Tên</label>
             <input
               id="firstName"
               type="text"
@@ -257,7 +322,7 @@ export function UserDetailModal({ userId, departments, isAdmin, token, onClose, 
           </div>
 
           <div className="form-group">
-            <label htmlFor="lastName">Last Name</label>
+            <label htmlFor="lastName">Họ</label>
             <input
               id="lastName"
               type="text"
@@ -269,7 +334,7 @@ export function UserDetailModal({ userId, departments, isAdmin, token, onClose, 
         </div>
 
         <div className="form-group">
-          <label htmlFor="username">Username</label>
+          <label htmlFor="username">Tên đăng nhập</label>
           <input
             id="username"
             type="text"
@@ -292,31 +357,28 @@ export function UserDetailModal({ userId, departments, isAdmin, token, onClose, 
         </div>
 
         <div className="form-group">
-          <label htmlFor="profileImg">Profile Image URL</label>
+          <label htmlFor="position">Chức vụ</label>
           <input
-            id="profileImg"
+            id="position"
             type="text"
-            value={profileImg}
-            onChange={(e) => setProfileImg(e.target.value)}
-            placeholder="https://example.com/image.jpg"
+            value={position}
+            onChange={(e) => setPosition(e.target.value)}
             disabled={!isAdmin}
           />
         </div>
 
         <div className="form-group">
-          <label htmlFor="department">Department / Sub-department</label>
+          <label htmlFor="department">Bộ phận / Ban</label>
           <select
             id="department"
             value={departmentOrSub}
             onChange={(e) => setDepartmentOrSub(e.target.value)}
             disabled={!isAdmin}
           >
-            <option value="">No Department</option>
+            <option value="">Không có bộ phận</option>
             {departments.map((dept) => (
               <optgroup key={dept.id} label={dept.name}>
-                <option value={`dept-${dept.id}`}>
-                  {dept.name}
-                </option>
+                <option value={`dept-${dept.id}`}>{dept.name}</option>
                 {(dept.sub_departments || []).map((sub) => (
                   <option key={`sub-${sub.id}`} value={`sub-${sub.id}`}>
                     — {sub.name}
@@ -329,27 +391,31 @@ export function UserDetailModal({ userId, departments, isAdmin, token, onClose, 
 
         {isAdmin && (
           <div className="password-reset-section">
-            <label>Password</label>
+            <label>Mật khẩu</label>
             {newPassword ? (
               <div className="new-password-display">
                 <code>{newPassword}</code>
-                <button type="button" className="btn-copy" onClick={copyPassword}>
+                <button
+                  type="button"
+                  className="btn-copy"
+                  onClick={copyPassword}
+                >
                   Copy
                 </button>
               </div>
             ) : (
-              <button 
-                type="button" 
+              <button
+                type="button"
                 className="btn-reset-password"
                 onClick={handleResetPassword}
                 disabled={resetting}
               >
-                {resetting ? 'Resetting...' : 'Reset Password'}
+                {resetting ? "Đang đặt lại..." : "Đặt lại mật khẩu"}
               </button>
             )}
             {newPassword && (
               <p className="password-warning">
-                Save this password now. It will not be shown again.
+                Lưu mật khẩu này ngay. Nó sẽ không được hiển thị lại.
               </p>
             )}
           </div>
@@ -357,34 +423,62 @@ export function UserDetailModal({ userId, departments, isAdmin, token, onClose, 
 
         {isAdmin && !user?.is_admin && (
           <div className="danger-zone">
-            <label>Danger Zone</label>
-            <button 
-              type="button" 
+            <label>Khu vực nguy hiểm</label>
+            <button
+              type="button"
               className="btn-delete"
               onClick={handleDelete}
               disabled={deleting}
             >
-              {deleting ? 'Deleting...' : 'Delete User'}
+              {deleting ? "Đang xóa..." : "Xóa người dùng"}
             </button>
           </div>
         )}
 
         <div className="form-actions">
           <button type="button" className="btn-cancel" onClick={handleClose}>
-            {isAdmin ? 'Cancel' : 'Close'}
+            {isAdmin ? "Hủy" : "Đóng"}
           </button>
           {isAdmin && (
-            <button 
-              type="button" 
-              className="btn-save" 
+            <button
+              type="button"
+              className="btn-save"
               onClick={handleSave}
               disabled={saving}
             >
-              {saving ? 'Saving...' : 'Save Changes'}
+              {saving ? "Đang lưu..." : "Lưu thay đổi"}
             </button>
           )}
         </div>
+
+        {cropImageSrc && (
+          <ImageCropModal
+            imageSrc={cropImageSrc}
+            aspectRatio={1}
+            cropShape="round"
+            onCancel={() => setCropImageSrc(null)}
+            onCrop={async (blob) => {
+              const formData = new FormData();
+              formData.append("file", blob, "profile.jpg");
+              try {
+                const res = await fetch("/api/upload", {
+                  method: "POST",
+                  body: formData,
+                });
+                if (!res.ok) {
+                  const data = await res.json();
+                  throw new Error(data.detail || "Tải lên thất bại");
+                }
+                const { url } = await res.json();
+                setProfileImg(url);
+              } catch (err) {
+                setError(err.message);
+              }
+              setCropImageSrc(null);
+            }}
+          />
+        )}
       </div>
     </div>
-  )
+  );
 }

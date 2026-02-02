@@ -1,54 +1,54 @@
-import { useState } from 'react'
-import './LoginModal.css'
+import { useState } from "react";
+import "./LoginModal.css";
 
 export function LoginModal({ onLogin, onClose }) {
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
+    e.preventDefault();
+    setError("");
+    setLoading(true);
 
     try {
-      await onLogin(username, password)
-      onClose()
+      await onLogin(username, password);
+      onClose();
     } catch (err) {
-      setError(err.message)
+      setError(err.message);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <h2>Admin Login</h2>
-        
+        <h2>Đăng nhập quản trị</h2>
+
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label htmlFor="username">Username</label>
+            <label htmlFor="username">Tên đăng nhập</label>
             <input
               id="username"
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter username"
+              placeholder="Nhập tên đăng nhập"
               required
               autoFocus
             />
           </div>
 
           <div className="form-group">
-            <label htmlFor="password">Password</label>
+            <label htmlFor="password">Mật khẩu</label>
             <input
               id="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter password"
+              placeholder="Nhập mật khẩu"
               required
             />
           </div>
@@ -57,14 +57,14 @@ export function LoginModal({ onLogin, onClose }) {
 
           <div className="form-actions">
             <button type="button" className="btn-cancel" onClick={onClose}>
-              Cancel
+              Hủy
             </button>
             <button type="submit" className="btn-login" disabled={loading}>
-              {loading ? 'Logging in...' : 'Login'}
+              {loading ? "Đang đăng nhập..." : "Đăng nhập"}
             </button>
           </div>
         </form>
       </div>
     </div>
-  )
+  );
 }

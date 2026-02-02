@@ -17,16 +17,20 @@ router = APIRouter(prefix="/departments", tags=["departments"])
 class DepartmentCreateRequest(BaseModel):
     name: str
     description: str | None = None
+    profile_img: str | None = None
 
 
 class DepartmentUpdateRequest(BaseModel):
     name: str | None = None
     description: str | None = None
+    profile_img: str | None = None
 
 
 def _active_sub_departments(department) -> list:
-    """Sub-departments that are not deleted and not placeholder (Unassigned has no sub-departments)."""
-    return [s for s in department.sub_departments if not s.deleted and not s.is_placeholder]
+    """Sub-departments that are not deleted and not placeholder (Phòng 'Chưa phân công' không có ban con)."""
+    return [
+        s for s in department.sub_departments if not s.deleted and not s.is_placeholder
+    ]
 
 
 def _department_user_count(department) -> int:
@@ -45,11 +49,18 @@ def list_departments(db: Session = Depends(get_db)):
             "id": d.id,
             "name": d.name,
             "description": d.description,
+            "profile_img": d.profile_img,
             "is_placeholder": d.is_placeholder,
             "user_count": _department_user_count(d),
             "direct_user_count": len(d.users),
             "sub_departments": [
-                {"id": s.id, "name": s.name, "description": s.description, "user_count": len(s.users)}
+                {
+                    "id": s.id,
+                    "name": s.name,
+                    "description": s.description,
+                    "profile_img": s.profile_img,
+                    "user_count": len(s.users),
+                }
                 for s in _active_sub_departments(d)
             ],
         }
@@ -82,14 +93,20 @@ def restore_department(
     _admin=Depends(require_admin),
 ):
     """Restore a soft-deleted department. Admin only. Cannot restore placeholder."""
-    dept = db.query(Department).filter(
-        Department.id == department_id,
-        Department.deleted == True,
-    ).first()
+    dept = (
+        db.query(Department)
+        .filter(
+            Department.id == department_id,
+            Department.deleted == True,
+        )
+        .first()
+    )
     if not dept:
         raise HTTPException(status_code=404, detail="Deleted department not found")
     if dept.is_placeholder:
-        raise HTTPException(status_code=400, detail="Cannot restore placeholder department")
+        raise HTTPException(
+            status_code=400, detail="Cannot restore placeholder department"
+        )
     dept.deleted = False
     dept.deleted_at = None
     db.commit()
@@ -114,11 +131,18 @@ def get_department(department_id: int, db: Session = Depends(get_db)):
         "id": dept.id,
         "name": dept.name,
         "description": dept.description,
+        "profile_img": dept.profile_img,
         "is_placeholder": dept.is_placeholder,
         "user_count": _department_user_count(dept),
         "direct_user_count": len(dept.users),
         "sub_departments": [
-            {"id": s.id, "name": s.name, "description": s.description, "user_count": len(s.users)}
+            {
+                "id": s.id,
+                "name": s.name,
+                "description": s.description,
+                "profile_img": s.profile_img,
+                "user_count": len(s.users),
+            }
             for s in _active_sub_departments(dept)
         ],
     }
@@ -133,10 +157,13 @@ def create_department(
     """Create a new department. Admin only."""
     existing = db.query(Department).filter(Department.name == request.name).first()
     if existing:
-        raise HTTPException(status_code=400, detail="Department with this name already exists")
+        raise HTTPException(
+            status_code=400, detail="Department with this name already exists"
+        )
     dept = Department(
         name=request.name,
         description=request.description,
+        profile_img=request.profile_img,
         is_placeholder=False,
         deleted=False,
     )
@@ -147,6 +174,7 @@ def create_department(
         "id": dept.id,
         "name": dept.name,
         "description": dept.description,
+        "profile_img": dept.profile_img,
         "is_placeholder": dept.is_placeholder,
         "user_count": 0,
         "direct_user_count": 0,
@@ -166,25 +194,42 @@ def update_department(
     if not dept:
         raise HTTPException(status_code=404, detail="Department not found")
     if dept.is_placeholder:
-        raise HTTPException(status_code=400, detail="Cannot edit placeholder department")
+        raise HTTPException(
+            status_code=400, detail="Cannot edit placeholder department"
+        )
     if request.name is not None:
-        other = db.query(Department).filter(Department.name == request.name, Department.id != department_id).first()
+        other = (
+            db.query(Department)
+            .filter(Department.name == request.name, Department.id != department_id)
+            .first()
+        )
         if other:
-            raise HTTPException(status_code=400, detail="Department with this name already exists")
+            raise HTTPException(
+                status_code=400, detail="Department with this name already exists"
+            )
         dept.name = request.name
     if request.description is not None:
         dept.description = request.description
+    if request.profile_img is not None:
+        dept.profile_img = request.profile_img
     db.commit()
     db.refresh(dept)
     return {
         "id": dept.id,
         "name": dept.name,
         "description": dept.description,
+        "profile_img": dept.profile_img,
         "is_placeholder": dept.is_placeholder,
         "user_count": _department_user_count(dept),
         "direct_user_count": len(dept.users),
         "sub_departments": [
-            {"id": s.id, "name": s.name, "description": s.description, "user_count": len(s.users)}
+            {
+                "id": s.id,
+                "name": s.name,
+                "description": s.description,
+                "profile_img": s.profile_img,
+                "user_count": len(s.users),
+            }
             for s in _active_sub_departments(dept)
         ],
     }
@@ -201,7 +246,9 @@ def delete_department(
     if not dept:
         raise HTTPException(status_code=404, detail="Department not found")
     if dept.is_placeholder:
-        raise HTTPException(status_code=400, detail="Cannot delete placeholder department")
+        raise HTTPException(
+            status_code=400, detail="Cannot delete placeholder department"
+        )
 
     placeholder = department_repo.get_placeholder_department(db)
     if not placeholder:
@@ -220,4 +267,6 @@ def delete_department(
     dept.deleted = True
     dept.deleted_at = datetime.now(timezone.utc)
     db.commit()
-    return {"message": "Department deleted (soft). Sub-departments and users reassigned to Unassigned."}
+    return {
+        "message": "Phòng đã xóa (mềm). Các ban và người dùng đã được chuyển sang Chưa phân công."
+    }
