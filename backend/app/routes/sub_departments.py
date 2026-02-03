@@ -17,6 +17,7 @@ class SubDepartmentCreateRequest(BaseModel):
     name: str
     description: str | None = None
     profile_img: str | None = None
+    floor: str | None = None
     department_id: int
 
 
@@ -24,7 +25,13 @@ class SubDepartmentUpdateRequest(BaseModel):
     name: str | None = None
     description: str | None = None
     profile_img: str | None = None
+    floor: str | None = None
     department_id: int | None = None
+
+
+def _active_users(users) -> list:
+    """Users that are not soft-deleted."""
+    return [u for u in users if not u.deleted]
 
 
 def _sub_to_dict(sub: SubDepartment) -> dict:
@@ -33,10 +40,11 @@ def _sub_to_dict(sub: SubDepartment) -> dict:
         "name": sub.name,
         "description": sub.description,
         "profile_img": sub.profile_img,
+        "floor": sub.floor,
         "department_id": sub.department_id,
         "department_name": sub.department.name if sub.department else None,
         "is_placeholder": sub.is_placeholder,
-        "user_count": len(sub.users),
+        "user_count": len(_active_users(sub.users)),
     }
 
 
@@ -52,7 +60,7 @@ def list_sub_departments(
         )
     else:
         sub_depts = sub_department_repo.get_all_sub_departments(db)
-    # Loại trừ placeholder sub-department (Phòng 'Chưa phân công' không có ban con)
+    # Loại trừ placeholder sub-department (bộ phận 'Chưa phân công' không có ban con)
     return [_sub_to_dict(s) for s in sub_depts if not s.is_placeholder]
 
 
@@ -107,6 +115,32 @@ def restore_sub_department(
     }
 
 
+@router.delete("/{sub_department_id}/permanent")
+def permanent_delete_sub_department(
+    sub_department_id: int,
+    db: Session = Depends(get_db),
+    _admin=Depends(require_admin),
+):
+    """Permanently delete a soft-deleted sub_department. Admin only. Cannot delete placeholder."""
+    sub = (
+        db.query(SubDepartment)
+        .filter(
+            SubDepartment.id == sub_department_id,
+            SubDepartment.deleted == True,
+        )
+        .first()
+    )
+    if not sub:
+        raise HTTPException(status_code=404, detail="Ban đã xóa không tìm thấy")
+    if sub.is_placeholder:
+        raise HTTPException(
+            status_code=400, detail="Không thể xóa vĩnh viễn ban placeholder"
+        )
+    db.delete(sub)
+    db.commit()
+    return {"message": "Ban đã được xóa vĩnh viễn"}
+
+
 @router.get("/{sub_department_id}")
 def get_sub_department(sub_department_id: int, db: Session = Depends(get_db)):
     """Get a single sub_department by ID. Read-only for all."""
@@ -137,6 +171,7 @@ def create_sub_department(
         name=request.name,
         description=request.description,
         profile_img=request.profile_img,
+        floor=request.floor,
         department_id=request.department_id,
         is_placeholder=False,
         deleted=False,
@@ -175,6 +210,8 @@ def update_sub_department(
         sub.description = request.description
     if request.profile_img is not None:
         sub.profile_img = request.profile_img
+    if request.floor is not None:
+        sub.floor = request.floor
     if request.department_id is not None:
         dept = department_repo.get_department_by_id(db, request.department_id)
         if not dept:
@@ -191,7 +228,7 @@ def delete_sub_department(
     db: Session = Depends(get_db),
     _admin=Depends(require_admin),
 ):
-    """Xóa mềm một ban (sub-department). Gán lại người dùng sang phòng 'Chưa phân công' (không có ban con). Chỉ quản trị viên."""
+    """Xóa mềm một ban (sub-department). Gán lại người dùng sang bộ phận 'Chưa phân công' (không có ban con). Chỉ quản trị viên."""
     sub = (
         db.query(SubDepartment)
         .filter(

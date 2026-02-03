@@ -34,6 +34,7 @@ class UserUpdateRequest(BaseModel):
     profile_img: str | None = None
     department_id: int | None = None
     sub_department_id: int | None = None
+    position: str | None = None
 
 
 def generate_random_password(length: int = 12) -> str:
@@ -242,6 +243,9 @@ def update_user(
 
     if request.profile_img is not None:
         user.profile_img = request.profile_img
+
+    if request.position is not None:
+        user.position = request.position
 
     if request.department_id is not None or request.sub_department_id is not None:
         # Resolve: user can have only one of department or sub_department

@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import inspect, text
 
 from app.config.database import Base, SessionLocal, engine
 from app.domain.app_settings import (
@@ -16,12 +17,39 @@ from app.routes import auth, departments, settings, sub_departments, uploads, us
 from app.seed import seed_data
 
 
+def run_migrations(db):
+    """Run manual migrations for schema changes."""
+    inspector = inspect(engine)
+
+    # Migration: Add display_order column to departments table
+    dept_columns = [col["name"] for col in inspector.get_columns("departments")]
+    if "display_order" not in dept_columns:
+        db.execute(
+            text(
+                "ALTER TABLE departments ADD COLUMN display_order INTEGER DEFAULT 0 NOT NULL"
+            )
+        )
+        db.commit()
+
+    # Migration: Add floor column to departments table
+    if "floor" not in dept_columns:
+        db.execute(text("ALTER TABLE departments ADD COLUMN floor TEXT"))
+        db.commit()
+
+    # Migration: Add floor column to sub_departments table
+    sub_dept_columns = [col["name"] for col in inspector.get_columns("sub_departments")]
+    if "floor" not in sub_dept_columns:
+        db.execute(text("ALTER TABLE sub_departments ADD COLUMN floor TEXT"))
+        db.commit()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Create tables and seed data on startup."""
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
+        run_migrations(db)
         seed_data(db)
     finally:
         db.close()

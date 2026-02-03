@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean
+from sqlalchemy import Boolean, Column, DateTime, Integer, String
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -12,7 +12,9 @@ class Department(Base):
     name = Column(String, unique=True, nullable=False)
     description = Column(String, nullable=True)
     profile_img = Column(String, nullable=True)
+    floor = Column(String, nullable=True)
     is_placeholder = Column(Boolean, default=False, nullable=False)
+    display_order = Column(Integer, default=0, nullable=False)
     deleted = Column(Boolean, default=False, nullable=False)
     deleted_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

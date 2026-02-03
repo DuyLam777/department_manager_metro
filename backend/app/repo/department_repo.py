@@ -5,7 +5,11 @@ from app.domain.sub_department import SubDepartment  # noqa: F401 - resolve rela
 
 
 def get_all_departments(db: Session, include_deleted: bool = False) -> list[Department]:
-    """Get all non-deleted departments with users and sub_departments loaded."""
+    """Get all non-deleted departments with users and sub_departments loaded.
+
+    Orders by: is_placeholder ASC (non-placeholder first), then display_order ASC.
+    This ensures 'Chưa phân công' is always last.
+    """
     q = (
         db.query(Department)
         .filter(Department.deleted == False)
@@ -13,6 +17,7 @@ def get_all_departments(db: Session, include_deleted: bool = False) -> list[Depa
             joinedload(Department.users),
             joinedload(Department.sub_departments).joinedload(SubDepartment.users),
         )
+        .order_by(Department.is_placeholder.asc(), Department.display_order.asc())
     )
     return q.all()
 
@@ -22,7 +27,9 @@ def get_placeholder_department(db: Session) -> Department | None:
     return db.query(Department).filter(Department.is_placeholder == True).first()
 
 
-def get_department_by_id(db: Session, department_id: int, include_deleted: bool = False) -> Department | None:
+def get_department_by_id(
+    db: Session, department_id: int, include_deleted: bool = False
+) -> Department | None:
     """Get a department by ID."""
     q = db.query(Department).filter(Department.id == department_id)
     if not include_deleted:

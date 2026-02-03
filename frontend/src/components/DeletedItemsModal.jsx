@@ -143,6 +143,56 @@ export function DeletedItemsModal({
     }
   };
 
+  const handlePermanentDeleteDepartment = async (deptId, name) => {
+    if (
+      !confirm(
+        `Bạn có chắc muốn XÓA VĨNH VIỄN bộ phận "${name}"? Hành động này không thể phục hồi!`,
+      )
+    )
+      return;
+    setActionLoading(`dept-${deptId}`);
+    try {
+      const response = await fetch(`/api/departments/${deptId}/permanent`, {
+        method: "DELETE",
+        headers: authHeaders(token),
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.detail || "Xóa bộ phận thất bại");
+      }
+      setDepartments(departments.filter((d) => d.id !== deptId));
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handlePermanentDeleteSubDepartment = async (subId, name) => {
+    if (
+      !confirm(
+        `Bạn có chắc muốn XÓA VĨNH VIỄN ban "${name}"? Hành động này không thể phục hồi!`,
+      )
+    )
+      return;
+    setActionLoading(`sub-${subId}`);
+    try {
+      const response = await fetch(`/api/sub-departments/${subId}/permanent`, {
+        method: "DELETE",
+        headers: authHeaders(token),
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.detail || "Xóa ban thất bại");
+      }
+      setSubDepartments(subDepartments.filter((s) => s.id !== subId));
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleCleanupOldDeletedUsers = async () => {
     if (
       !confirm("Xóa vĩnh viễn tất cả người dùng đã bị xóa hơn 30 ngày trước?")
@@ -326,14 +376,28 @@ export function DeletedItemsModal({
                           Đã xóa: {formatDate(d.deleted_at)}
                         </span>
                       </div>
-                      <button
-                        type="button"
-                        className="btn-restore"
-                        onClick={() => handleRestoreDepartment(d.id, d.name)}
-                        disabled={actionLoading === `dept-${d.id}`}
-                      >
-                        {actionLoading === `dept-${d.id}` ? "..." : "Khôi phục"}
-                      </button>
+                      <div className="dept-actions">
+                        <button
+                          type="button"
+                          className="btn-restore"
+                          onClick={() => handleRestoreDepartment(d.id, d.name)}
+                          disabled={actionLoading === `dept-${d.id}`}
+                        >
+                          {actionLoading === `dept-${d.id}`
+                            ? "..."
+                            : "Khôi phục"}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-perma-delete"
+                          onClick={() =>
+                            handlePermanentDeleteDepartment(d.id, d.name)
+                          }
+                          disabled={actionLoading === `dept-${d.id}`}
+                        >
+                          Xóa vĩnh viễn
+                        </button>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -366,14 +430,30 @@ export function DeletedItemsModal({
                           Đã xóa: {formatDate(s.deleted_at)}
                         </span>
                       </div>
-                      <button
-                        type="button"
-                        className="btn-restore"
-                        onClick={() => handleRestoreSubDepartment(s.id, s.name)}
-                        disabled={actionLoading === `sub-${s.id}`}
-                      >
-                        {actionLoading === `sub-${s.id}` ? "..." : "Khôi phục"}
-                      </button>
+                      <div className="dept-actions">
+                        <button
+                          type="button"
+                          className="btn-restore"
+                          onClick={() =>
+                            handleRestoreSubDepartment(s.id, s.name)
+                          }
+                          disabled={actionLoading === `sub-${s.id}`}
+                        >
+                          {actionLoading === `sub-${s.id}`
+                            ? "..."
+                            : "Khôi phục"}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-perma-delete"
+                          onClick={() =>
+                            handlePermanentDeleteSubDepartment(s.id, s.name)
+                          }
+                          disabled={actionLoading === `sub-${s.id}`}
+                        >
+                          Xóa vĩnh viễn
+                        </button>
+                      </div>
                     </li>
                   ))}
                 </ul>

@@ -77,12 +77,7 @@
     border: 1px solid #e5e7eb;
     border-radius: 0.5rem;
     padding: 1.25rem;
-    margin-bottom: 1.25rem;
     background-color: #fafafa;
-}
-
-.manage-dept-card:last-of-type {
-    margin-bottom: 0;
 }
 
 .manage-dept-row {
@@ -90,6 +85,60 @@
     justify-content: space-between;
     align-items: flex-start;
     gap: 1rem;
+}
+
+.manage-dept-drag-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 24px;
+    height: 32px;
+    cursor: grab;
+    color: #9ca3af;
+    border-radius: 0.25rem;
+    transition:
+        background-color 0.2s,
+        color 0.2s;
+    user-select: none;
+}
+
+.manage-dept-drag-handle:hover {
+    background-color: #f3f4f6;
+    color: #6b7280;
+}
+
+.manage-dept-drag-handle:active {
+    cursor: grabbing;
+}
+
+.drag-handle-icon {
+    font-size: 1rem;
+    letter-spacing: -2px;
+    line-height: 1;
+}
+
+/* Drag and drop states */
+.manage-dept-card-wrapper {
+    position: relative;
+    margin-bottom: 1rem;
+}
+
+.manage-dept-card-wrapper:last-child {
+    margin-bottom: 0;
+}
+
+.manage-dept-card.dragging {
+    opacity: 0.4;
+    background-color: #f3f4f6;
+}
+
+.drop-indicator {
+    height: 3px;
+    background: linear-gradient(90deg, #4f46e5, #818cf8);
+    border-radius: 2px;
+    margin: 4px 0;
+    box-shadow: 0 0 8px rgba(79, 70, 229, 0.5);
 }
 
 .manage-dept-info {
@@ -474,7 +523,6 @@
 
     .manage-dept-card {
         padding: 1rem;
-        margin-bottom: 1rem;
     }
 
     .manage-dept-row {

@@ -1,394 +1,399 @@
 .deleted-items-modal {
-  max-width: 600px;
-  max-height: 80vh;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  padding: 1.25rem 1.5rem;
+    max-width: 600px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: 1.25rem 1.5rem;
 }
 
 .deleted-items-modal-header {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid #e5e7eb;
-  flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #e5e7eb;
+    flex-shrink: 0;
 }
 
 .deleted-items-modal-header h2 {
-  margin: 0;
-  font-size: 1.35rem;
-  color: #111827;
-  flex: 1;
+    margin: 0;
+    font-size: 1.35rem;
+    color: #111827;
+    flex: 1;
 }
 
 .deleted-items-close-btn {
-  flex-shrink: 0;
-  background: none;
-  border: none;
-  font-size: 1.75rem;
-  line-height: 1;
-  padding: 0.25rem;
-  cursor: pointer;
-  color: #b91c1c;
-  border-radius: 0.375rem;
-  transition: color 0.2s, background-color 0.2s;
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    font-size: 1.75rem;
+    line-height: 1;
+    padding: 0.25rem;
+    cursor: pointer;
+    color: #b91c1c;
+    border-radius: 0.375rem;
+    transition:
+        color 0.2s,
+        background-color 0.2s;
 }
 
 .deleted-items-close-btn:hover {
-  color: #991b1b;
-  background-color: #fef2f2;
+    color: #991b1b;
+    background-color: #fef2f2;
 }
 
 .modal-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.75rem 1rem;
-  background-color: #f9fafb;
-  border-radius: 0.5rem;
-  margin-bottom: 1rem;
-  flex-shrink: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background-color: #f9fafb;
+    border-radius: 0.5rem;
+    margin-bottom: 1rem;
+    flex-shrink: 0;
 }
 
 .user-count-info {
-  font-size: 0.9rem;
-  color: #6b7280;
+    font-size: 0.9rem;
+    color: #6b7280;
 }
 
 .btn-cleanup {
-  padding: 0.5rem 1rem;
-  background-color: #f59e0b;
-  color: white;
-  border: none;
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  cursor: pointer;
-  transition: background-color 0.2s;
+    padding: 0.5rem 1rem;
+    background-color: #f59e0b;
+    color: white;
+    border: none;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
 }
 
 .btn-cleanup:hover:not(:disabled) {
-  background-color: #d97706;
+    background-color: #d97706;
 }
 
 .btn-cleanup:disabled {
-  background-color: #9ca3af;
-  cursor: not-allowed;
+    background-color: #9ca3af;
+    cursor: not-allowed;
 }
 
 .error-message {
-  color: #dc2626;
-  font-size: 0.875rem;
-  margin-bottom: 1rem;
-  padding: 0.5rem;
-  background-color: #fef2f2;
-  border-radius: 0.375rem;
+    color: #dc2626;
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+    padding: 0.5rem;
+    background-color: #fef2f2;
+    border-radius: 0.375rem;
 }
 
 .loading-text,
 .empty-text {
-  text-align: center;
-  color: #6b7280;
-  padding: 2rem;
+    text-align: center;
+    color: #6b7280;
+    padding: 2rem;
 }
 
 .deleted-items-modal-body {
-  overflow-y: auto;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 1.75rem;
-  min-height: 0;
+    overflow-y: auto;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1.75rem;
+    min-height: 0;
 }
 
 .deleted-section {
-  flex-shrink: 0;
-  margin-bottom: 0.25rem;
+    flex-shrink: 0;
+    margin-bottom: 0.25rem;
 }
 
 .deleted-section-header {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 0.75rem;
-  flex-wrap: wrap;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+    flex-wrap: wrap;
 }
 
 .deleted-section-header h3 {
-  margin: 0;
-  font-size: 1.1rem;
-  color: #374151;
+    margin: 0;
+    font-size: 1.1rem;
+    color: #374151;
 }
 
 .deleted-section-count {
-  font-size: 0.875rem;
-  color: #6b7280;
+    font-size: 0.875rem;
+    color: #6b7280;
 }
 
 .deleted-dept-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.5rem;
-  overflow: hidden;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    overflow: hidden;
 }
 
 .deleted-dept-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.875rem 1rem;
-  border-bottom: 1px solid #e5e7eb;
-  gap: 0.75rem;
-  flex-wrap: wrap;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.875rem 1rem;
+    border-bottom: 1px solid #e5e7eb;
+    gap: 0.75rem;
+    flex-wrap: wrap;
 }
 
 .deleted-dept-row:last-child {
-  border-bottom: none;
+    border-bottom: none;
 }
 
 .deleted-dept-info {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-  min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
 }
 
 .deleted-dept-name {
-  font-weight: 600;
-  color: #111827;
+    font-weight: 600;
+    color: #111827;
 }
 
 .deleted-dept-desc {
-  font-size: 0.875rem;
-  color: #6b7280;
+    font-size: 0.875rem;
+    color: #6b7280;
 }
 
 .deleted-dept-date {
-  font-size: 0.75rem;
-  color: #9ca3af;
-  width: 100%;
+    font-size: 0.75rem;
+    color: #9ca3af;
+    width: 100%;
 }
 
 .deleted-users-list {
-  overflow-y: auto;
-  flex: 1;
+    overflow-y: auto;
+    flex: 1;
 }
 
 .deleted-user-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem;
-  border-bottom: 1px solid #e5e7eb;
-  gap: 0.75rem;
-  flex-wrap: wrap;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    border-bottom: 1px solid #e5e7eb;
+    gap: 0.75rem;
+    flex-wrap: wrap;
 }
 
 .deleted-user-row:last-child {
-  border-bottom: none;
+    border-bottom: none;
 }
 
 .user-info {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex: 1;
-  min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex: 1;
+    min-width: 0;
 }
 
 .user-avatar-small {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  object-fit: cover;
-  flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
 }
 
 .user-details {
-  min-width: 0;
+    min-width: 0;
 }
 
 .user-name {
-  font-weight: 600;
-  color: #111827;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+    font-weight: 600;
+    color: #111827;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .user-meta {
-  font-size: 0.8rem;
-  color: #6b7280;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+    font-size: 0.8rem;
+    color: #6b7280;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .deleted-info {
-  font-size: 0.75rem;
-  color: #9ca3af;
+    font-size: 0.75rem;
+    color: #9ca3af;
 }
 
 .days-warning {
-  color: #dc2626;
-  font-weight: 500;
+    color: #dc2626;
+    font-weight: 500;
 }
 
-.user-actions {
-  display: flex;
-  gap: 0.5rem;
-  flex-shrink: 0;
+.user-actions,
+.dept-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
 }
 
 .btn-restore {
-  padding: 0.375rem 0.75rem;
-  background-color: #10b981;
-  color: white;
-  border: none;
-  border-radius: 0.375rem;
-  font-size: 0.8rem;
-  cursor: pointer;
-  transition: background-color 0.2s;
+    padding: 0.375rem 0.75rem;
+    background-color: #10b981;
+    color: white;
+    border: none;
+    border-radius: 0.375rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
 }
 
 .btn-restore:hover:not(:disabled) {
-  background-color: #059669;
+    background-color: #059669;
 }
 
 .btn-perma-delete {
-  padding: 0.375rem 0.75rem;
-  background-color: #dc2626;
-  color: white;
-  border: none;
-  border-radius: 0.375rem;
-  font-size: 0.8rem;
-  cursor: pointer;
-  transition: background-color 0.2s;
+    padding: 0.375rem 0.75rem;
+    background-color: #dc2626;
+    color: white;
+    border: none;
+    border-radius: 0.375rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
 }
 
 .btn-perma-delete:hover:not(:disabled) {
-  background-color: #b91c1c;
+    background-color: #b91c1c;
 }
 
 .btn-restore:disabled,
 .btn-perma-delete:disabled {
-  background-color: #9ca3af;
-  cursor: not-allowed;
+    background-color: #9ca3af;
+    cursor: not-allowed;
 }
 
 /* Mobile Responsive */
 @media (max-width: 640px) {
-  .deleted-items-modal {
-    max-width: 100%;
-    margin: 0.75rem;
-    max-height: 85vh;
-    padding: 1rem 1.25rem;
-  }
+    .deleted-items-modal {
+        max-width: 100%;
+        margin: 0.75rem;
+        max-height: 85vh;
+        padding: 1rem 1.25rem;
+    }
 
-  .deleted-items-modal-header {
-    margin-bottom: 0.75rem;
-    padding-bottom: 0.75rem;
-  }
+    .deleted-items-modal-header {
+        margin-bottom: 0.75rem;
+        padding-bottom: 0.75rem;
+    }
 
-  .deleted-items-modal-header h2 {
-    font-size: 1.25rem;
-    line-height: 1.3;
-  }
+    .deleted-items-modal-header h2 {
+        font-size: 1.25rem;
+        line-height: 1.3;
+    }
 
-  .deleted-items-close-btn {
-    min-width: 44px;
-    min-height: 44px;
-    padding: 0.5rem;
-  }
+    .deleted-items-close-btn {
+        min-width: 44px;
+        min-height: 44px;
+        padding: 0.5rem;
+    }
 
-  .deleted-items-modal-body {
-    gap: 1.5rem;
-  }
+    .deleted-items-modal-body {
+        gap: 1.5rem;
+    }
 
-  .deleted-section-header {
-    gap: 0.5rem;
-  }
+    .deleted-section-header {
+        gap: 0.5rem;
+    }
 
-  .deleted-dept-row {
-    padding: 0.75rem 0.875rem;
-    gap: 0.5rem;
-  }
+    .deleted-dept-row {
+        padding: 0.75rem 0.875rem;
+        gap: 0.5rem;
+    }
 
-  .deleted-dept-info {
-    min-width: 0;
-  }
+    .deleted-dept-info {
+        min-width: 0;
+    }
 
-  .deleted-user-row {
-    padding: 0.875rem;
-    gap: 0.75rem;
-  }
+    .deleted-user-row {
+        padding: 0.875rem;
+        gap: 0.75rem;
+    }
 
-  .user-actions {
-    gap: 0.5rem;
-  }
+    .user-actions,
+    .dept-actions {
+        gap: 0.5rem;
+    }
 
-  .btn-restore,
-  .btn-perma-delete {
-    padding: 0.5rem 0.75rem;
-    font-size: 0.8rem;
-  }
+    .btn-restore,
+    .btn-perma-delete {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.8rem;
+    }
 }
 
 @media (max-width: 480px) {
-  .deleted-items-modal {
-    margin: 0.5rem;
-    max-height: 90vh;
-    padding: 0.875rem 1rem;
-  }
+    .deleted-items-modal {
+        margin: 0.5rem;
+        max-height: 90vh;
+        padding: 0.875rem 1rem;
+    }
 
-  .deleted-items-modal-header h2 {
-    font-size: 1.1rem;
-  }
+    .deleted-items-modal-header h2 {
+        font-size: 1.1rem;
+    }
 
-  .modal-toolbar {
-    flex-direction: column;
-    gap: 0.5rem;
-    align-items: stretch;
-  }
+    .modal-toolbar {
+        flex-direction: column;
+        gap: 0.5rem;
+        align-items: stretch;
+    }
 
-  .user-count-info {
-    text-align: center;
-  }
+    .user-count-info {
+        text-align: center;
+    }
 
-  .btn-cleanup {
-    width: 100%;
-    min-height: 44px;
-  }
+    .btn-cleanup {
+        width: 100%;
+        min-height: 44px;
+    }
 
-  .deleted-user-row {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.75rem;
-  }
+    .deleted-user-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+    }
 
-  .user-actions {
-    justify-content: stretch;
-    flex-wrap: wrap;
-  }
+    .user-actions,
+    .dept-actions {
+        justify-content: stretch;
+        flex-wrap: wrap;
+    }
 
-  .btn-restore,
-  .btn-perma-delete {
-    flex: 1;
-    min-width: 0;
-    min-height: 44px;
-  }
+    .btn-restore,
+    .btn-perma-delete {
+        flex: 1;
+        min-width: 0;
+        min-height: 44px;
+    }
 
-  .deleted-dept-row {
-    flex-direction: column;
-    align-items: stretch;
-  }
+    .deleted-dept-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
 
-  .deleted-dept-row .btn-restore {
-    width: 100%;
-  }
+    .dept-actions {
+        width: 100%;
+    }
 }

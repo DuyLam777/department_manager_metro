@@ -51,41 +51,57 @@ def seed_data(db: Session):
         db.add(settings)
         db.flush()
 
-    # Placeholder department only (no sub-departments): giữ các người dùng chưa được phân công phòng/ban
+    # Placeholder department only (no sub-departments): giữ các người dùng chưa được phân công bộ phận/ban
     placeholder_dept = Department(
         name=PLACEHOLDER_DEPARTMENT_NAME,
-        description="Giữ người dùng chưa được phân công phòng (không có ban)",
+        description="Giữ người dùng chưa được phân công bộ phận (không có ban)",
         is_placeholder=True,
         deleted=False,
     )
     db.add(placeholder_dept)
     db.flush()
 
-    # Seed các phòng thực tế (tên và mô tả bằng tiếng Việt)
+    # Seed các bộ phận thực tế (tên và mô tả bằng tiếng Việt)
     engineering = Department(
-        name="Kỹ thuật", description="Đội phát triển phần mềm", is_placeholder=False
+        name="Kỹ thuật",
+        description="Đội phát triển phần mềm",
+        floor="Tầng 3",
+        is_placeholder=False,
     )
-    hr = Department(name="Nhân sự", description="Đội nhân sự", is_placeholder=False)
+    hr = Department(
+        name="Nhân sự",
+        description="Đội nhân sự",
+        floor="Tầng 2",
+        is_placeholder=False,
+    )
     sales = Department(
-        name="Bán hàng", description="Đội bán hàng và tiếp thị", is_placeholder=False
+        name="Bán hàng",
+        description="Đội bán hàng và tiếp thị",
+        floor="Tầng 1",
+        is_placeholder=False,
     )
 
     db.add_all([engineering, hr, sales])
     db.flush()  # Get IDs before creating sub_departments and users
 
-    # Seed các ban (thuộc các phòng) — tên/mô tả bằng tiếng Việt
+    # Seed các ban (thuộc các bộ phận) — tên/mô tả bằng tiếng Việt
     backend = SubDepartment(
         name="Phát triển Backend",
         description="Phát triển phía server / backend",
+        floor="Tầng 3 - Phòng 301",
         department_id=engineering.id,
     )
     frontend = SubDepartment(
         name="Phát triển Frontend",
         description="Phát triển giao diện / frontend",
+        floor="Tầng 3 - Phòng 302",
         department_id=engineering.id,
     )
     recruitment = SubDepartment(
-        name="Tuyển dụng", description="Đội tuyển dụng", department_id=hr.id
+        name="Tuyển dụng",
+        description="Đội tuyển dụng",
+        floor="Tầng 2 - Phòng 201",
+        department_id=hr.id,
     )
 
     db.add_all([backend, frontend, recruitment])
@@ -295,7 +311,7 @@ def seed_data(db: Session):
             department_id=sales.id,
             sub_department_id=None,
         ),
-        # Chưa phân công (dùng cho kiểm thử: người dùng không có phòng/ban)
+        # Chưa phân công (dùng cho kiểm thử: người dùng không có bộ phận/ban)
         User(
             username="quinn",
             email="quinn@example.com",
@@ -336,8 +352,8 @@ def seed_data(db: Session):
 
     db.add_all(users)
     db.commit()
-    print("Đã tạo phòng: Kỹ thuật, Nhân sự, Bán hàng")
+    print("Đã tạo bộ phận: Kỹ thuật, Nhân sự, Bán hàng")
     print(
         "Đã tạo ban: Phát triển Backend, Phát triển Frontend (Kỹ thuật); Tuyển dụng (Nhân sự)"
     )
-    print("Đã tạo người dùng: 21 tổng cộng (18 trong các phòng + 3 chưa phân công)")
+    print("Đã tạo người dùng: 21 tổng cộng (18 trong các bộ phận + 3 chưa phân công)")

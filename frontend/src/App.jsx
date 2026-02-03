@@ -184,6 +184,7 @@ function App() {
 
   const handleUserDelete = (userId) => {
     setUsers(users.filter((u) => u.id !== userId));
+    fetchDepartments(); // Refresh department/sub-department user counts in sidebar
   };
 
   const handleUserRestore = () => {
@@ -333,6 +334,7 @@ function App() {
                         type: "department",
                         id: dept.id,
                         name: dept.name,
+                        floor: dept.floor,
                       });
                       fetchUsersForFilter({
                         type: "department",
@@ -392,7 +394,7 @@ function App() {
                               type: "sub",
                               id: sub.id,
                               name: sub.name,
-                              departmentName: dept.name,
+                              floor: sub.floor,
                             };
                             setSelectedFilter(filter);
                             fetchUsersForFilter(filter);
@@ -416,7 +418,7 @@ function App() {
               className="sidebar-add-dept-btn"
               onClick={() => setShowManageDepartmentsModal(true)}
             >
-              Quản lý phòng
+              Quản lý bộ phận
             </button>
           )}
         </aside>
@@ -426,7 +428,7 @@ function App() {
           style={{ backgroundColor: appSettings.main_bg_color }}
         >
           {loading ? (
-            <p>Đang tải phòng...</p>
+            <p>Đang tải bộ phận...</p>
           ) : error ? (
             <p className="error-text">Lỗi: {error}</p>
           ) : !selectedFilter ? (
@@ -444,6 +446,7 @@ function App() {
                           type: "department",
                           id: dept.id,
                           name: dept.name,
+                          floor: dept.floor,
                         });
                         fetchUsersForFilter({
                           type: "department",
@@ -480,7 +483,7 @@ function App() {
                                 type: "sub",
                                 id: sub.id,
                                 name: sub.name,
-                                departmentName: dept.name,
+                                floor: sub.floor,
                               };
                               setSelectedFilter(filter);
                               fetchUsersForFilter(filter);
@@ -505,9 +508,9 @@ function App() {
             <>
               <div className="content-header">
                 <h1>
-                  {selectedFilter.type === "sub"
-                    ? `${selectedFilter.name} (${selectedFilter.departmentName}) — Người dùng`
-                    : `${selectedFilter.name} — Người dùng`}
+                  {selectedFilter.floor
+                    ? `${selectedFilter.name} - ${selectedFilter.floor}`
+                    : selectedFilter.name}
                 </h1>
                 <div className="header-actions">
                   <div className="search-box">

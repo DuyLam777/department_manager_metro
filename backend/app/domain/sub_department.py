@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -12,6 +12,7 @@ class SubDepartment(Base):
     name = Column(String, nullable=False)
     description = Column(String, nullable=True)
     profile_img = Column(String, nullable=True)
+    floor = Column(String, nullable=True)
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
     is_placeholder = Column(Boolean, default=False, nullable=False)
     deleted = Column(Boolean, default=False, nullable=False)

@@ -18,25 +18,40 @@ class DepartmentCreateRequest(BaseModel):
     name: str
     description: str | None = None
     profile_img: str | None = None
+    floor: str | None = None
 
 
 class DepartmentUpdateRequest(BaseModel):
     name: str | None = None
     description: str | None = None
     profile_img: str | None = None
+    floor: str | None = None
+
+
+class DepartmentReorderRequest(BaseModel):
+    """List of department IDs in the desired order (excluding placeholder)."""
+
+    department_ids: list[int]
 
 
 def _active_sub_departments(department) -> list:
-    """Sub-departments that are not deleted and not placeholder (Phòng 'Chưa phân công' không có ban con)."""
+    """Sub-departments that are not deleted and not placeholder (bộ phận 'Chưa phân công' không có ban con)."""
     return [
         s for s in department.sub_departments if not s.deleted and not s.is_placeholder
     ]
 
 
+def _active_users(users) -> list:
+    """Users that are not soft-deleted."""
+    return [u for u in users if not u.deleted]
+
+
 def _department_user_count(department) -> int:
-    """Count users: direct + users in non-deleted sub_departments."""
-    direct = len(department.users)
-    sub_users = sum(len(sub.users) for sub in _active_sub_departments(department))
+    """Count users: direct + users in non-deleted sub_departments. Excludes soft-deleted users."""
+    direct = len(_active_users(department.users))
+    sub_users = sum(
+        len(_active_users(sub.users)) for sub in _active_sub_departments(department)
+    )
     return direct + sub_users
 
 
@@ -50,22 +65,52 @@ def list_departments(db: Session = Depends(get_db)):
             "name": d.name,
             "description": d.description,
             "profile_img": d.profile_img,
+            "floor": d.floor,
             "is_placeholder": d.is_placeholder,
             "user_count": _department_user_count(d),
-            "direct_user_count": len(d.users),
+            "direct_user_count": len(_active_users(d.users)),
             "sub_departments": [
                 {
                     "id": s.id,
                     "name": s.name,
                     "description": s.description,
                     "profile_img": s.profile_img,
-                    "user_count": len(s.users),
+                    "floor": s.floor,
+                    "user_count": len(_active_users(s.users)),
                 }
                 for s in _active_sub_departments(d)
             ],
         }
         for d in departments
     ]
+
+
+@router.put("/reorder")
+def reorder_departments(
+    request: DepartmentReorderRequest,
+    db: Session = Depends(get_db),
+    _admin=Depends(require_admin),
+):
+    """Reorder departments by setting display_order. Admin only.
+
+    The placeholder department ('Chưa phân công') cannot be reordered and is always last.
+    """
+    # Update display_order for each department in the list
+    for index, dept_id in enumerate(request.department_ids):
+        dept = (
+            db.query(Department)
+            .filter(
+                Department.id == dept_id,
+                Department.deleted == False,
+                Department.is_placeholder == False,
+            )
+            .first()
+        )
+        if dept:
+            dept.display_order = index
+
+    db.commit()
+    return {"message": "Departments reordered successfully"}
 
 
 @router.get("/deleted/list")
@@ -121,6 +166,32 @@ def restore_department(
     }
 
 
+@router.delete("/{department_id}/permanent")
+def permanent_delete_department(
+    department_id: int,
+    db: Session = Depends(get_db),
+    _admin=Depends(require_admin),
+):
+    """Permanently delete a soft-deleted department. Admin only. Cannot delete placeholder."""
+    dept = (
+        db.query(Department)
+        .filter(
+            Department.id == department_id,
+            Department.deleted == True,
+        )
+        .first()
+    )
+    if not dept:
+        raise HTTPException(status_code=404, detail="Bộ phận đã xóa không tìm thấy")
+    if dept.is_placeholder:
+        raise HTTPException(
+            status_code=400, detail="Không thể xóa vĩnh viễn bộ phận 'Chưa phân công'"
+        )
+    db.delete(dept)
+    db.commit()
+    return {"message": "Bộ phận đã được xóa vĩnh viễn"}
+
+
 @router.get("/{department_id}")
 def get_department(department_id: int, db: Session = Depends(get_db)):
     """Get a single department by ID. Read-only for all."""
@@ -132,16 +203,18 @@ def get_department(department_id: int, db: Session = Depends(get_db)):
         "name": dept.name,
         "description": dept.description,
         "profile_img": dept.profile_img,
+        "floor": dept.floor,
         "is_placeholder": dept.is_placeholder,
         "user_count": _department_user_count(dept),
-        "direct_user_count": len(dept.users),
+        "direct_user_count": len(_active_users(dept.users)),
         "sub_departments": [
             {
                 "id": s.id,
                 "name": s.name,
                 "description": s.description,
                 "profile_img": s.profile_img,
-                "user_count": len(s.users),
+                "floor": s.floor,
+                "user_count": len(_active_users(s.users)),
             }
             for s in _active_sub_departments(dept)
         ],
@@ -164,6 +237,7 @@ def create_department(
         name=request.name,
         description=request.description,
         profile_img=request.profile_img,
+        floor=request.floor,
         is_placeholder=False,
         deleted=False,
     )
@@ -175,6 +249,7 @@ def create_department(
         "name": dept.name,
         "description": dept.description,
         "profile_img": dept.profile_img,
+        "floor": dept.floor,
         "is_placeholder": dept.is_placeholder,
         "user_count": 0,
         "direct_user_count": 0,
@@ -212,6 +287,8 @@ def update_department(
         dept.description = request.description
     if request.profile_img is not None:
         dept.profile_img = request.profile_img
+    if request.floor is not None:
+        dept.floor = request.floor
     db.commit()
     db.refresh(dept)
     return {
@@ -219,16 +296,18 @@ def update_department(
         "name": dept.name,
         "description": dept.description,
         "profile_img": dept.profile_img,
+        "floor": dept.floor,
         "is_placeholder": dept.is_placeholder,
         "user_count": _department_user_count(dept),
-        "direct_user_count": len(dept.users),
+        "direct_user_count": len(_active_users(dept.users)),
         "sub_departments": [
             {
                 "id": s.id,
                 "name": s.name,
                 "description": s.description,
                 "profile_img": s.profile_img,
-                "user_count": len(s.users),
+                "floor": s.floor,
+                "user_count": len(_active_users(s.users)),
             }
             for s in _active_sub_departments(dept)
         ],
@@ -268,5 +347,5 @@ def delete_department(
     dept.deleted_at = datetime.now(timezone.utc)
     db.commit()
     return {
-        "message": "Phòng đã xóa (mềm). Các ban và người dùng đã được chuyển sang Chưa phân công."
+        "message": "bộ phận đã xóa (mềm). Các ban và người dùng đã được chuyển sang Chưa phân công."
     }
