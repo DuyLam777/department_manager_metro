@@ -49,7 +49,7 @@ function App() {
   };
 
   // Fuzzy match function - checks if query chars appear in order in target
-  // Supports Vietnamese without accents (e.g., "nhan su" matches "Nhân sự")
+  // Supports Vietnamese without accents (e.g., "nhan su" matches accented text)
   const fuzzyMatch = (query, target) => {
     if (!query) return true;
     if (!target) return false;
@@ -72,7 +72,7 @@ function App() {
       fuzzyMatch(departmentSearchQuery, sub.name),
     );
   };
-  // Reorder: Chưa phân công (placeholder) first, then other departments
+  // Reorder: placeholder first, then other departments
   const reorderedDepartments = [
     ...departments.filter((d) => d.is_placeholder),
     ...departments.filter((d) => !d.is_placeholder),
@@ -177,7 +177,7 @@ function App() {
     .filter((u) => {
       if (!selectedFilter) return true;
       if (selectedFilter.type === "department") {
-        // Prefer `effective_bo_phan` (Bộ phận) from backend; fall back to older fields if absent
+        // Prefer `effective_bo_phan` from backend; fall back to older fields if absent
         const userDeptName =
           u.effective_bo_phan ||
           u.effective_department ||

@@ -75,7 +75,7 @@ def user_to_dict(u: User, include_deleted_at: bool = False) -> dict:
         "sub_department_id": u.sub_department_id,
         # Renamed: effective_department -> effective_bo_phan
         "effective_bo_phan": _effective_department_name(u),
-        # New: position (Chức vụ)
+        # Position/title field
         "position": u.position,
     }
     if include_deleted_at:

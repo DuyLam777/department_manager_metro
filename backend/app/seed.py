@@ -51,7 +51,7 @@ def seed_data(db: Session):
         db.add(settings)
         db.flush()
 
-    # Placeholder department only (no sub-departments): giữ các người dùng chưa được phân công bộ phận/ban
+    # Placeholder department (no sub-departments): holds unassigned users
     placeholder_dept = Department(
         name=PLACEHOLDER_DEPARTMENT_NAME,
         description="Giữ người dùng chưa được phân công bộ phận (không có ban)",
@@ -61,7 +61,7 @@ def seed_data(db: Session):
     db.add(placeholder_dept)
     db.flush()
 
-    # Seed các bộ phận thực tế (tên và mô tả bằng tiếng Việt)
+    # Seed actual departments
     engineering = Department(
         name="Kỹ thuật",
         description="Đội phát triển phần mềm",
@@ -84,7 +84,7 @@ def seed_data(db: Session):
     db.add_all([engineering, hr, sales])
     db.flush()  # Get IDs before creating sub_departments and users
 
-    # Seed các ban (thuộc các bộ phận) — tên/mô tả bằng tiếng Việt
+    # Seed sub-departments
     backend = SubDepartment(
         name="Phát triển Backend",
         description="Phát triển phía server / backend",
@@ -311,7 +311,7 @@ def seed_data(db: Session):
             department_id=sales.id,
             sub_department_id=None,
         ),
-        # Chưa phân công (dùng cho kiểm thử: người dùng không có bộ phận/ban)
+        # Unassigned users (for testing: users without department/sub-department)
         User(
             username="quinn",
             email="quinn@example.com",
@@ -352,8 +352,6 @@ def seed_data(db: Session):
 
     db.add_all(users)
     db.commit()
-    print("Đã tạo bộ phận: Kỹ thuật, Nhân sự, Bán hàng")
-    print(
-        "Đã tạo ban: Phát triển Backend, Phát triển Frontend (Kỹ thuật); Tuyển dụng (Nhân sự)"
-    )
-    print("Đã tạo người dùng: 21 tổng cộng (18 trong các bộ phận + 3 chưa phân công)")
+    print("Seeded departments: Engineering, HR, Sales")
+    print("Seeded sub-departments: Backend, Frontend (Engineering); Recruitment (HR)")
+    print("Seeded users: 19 total (16 in departments + 3 unassigned)")

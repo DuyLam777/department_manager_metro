@@ -15,7 +15,7 @@ class User(Base):
     last_name = Column(String, nullable=True)
     password_hash = Column(String, nullable=False)
     profile_img = Column(String, nullable=True)
-    position = Column(String, nullable=True)  # Chức vụ (position/title)
+    position = Column(String, nullable=True)
     is_admin = Column(Boolean, default=False)
     deleted = Column(Boolean, default=False)
     deleted_at = Column(DateTime(timezone=True), nullable=True)

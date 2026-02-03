@@ -64,7 +64,7 @@ export function ManageDepartmentsModal({ token, onClose, onSaved }) {
     (u) => (u.effective_bo_phan || u.effective_department) === "Chưa phân công",
   );
   const placeholderDeptId = departments.find((d) => d.is_placeholder)?.id;
-  // Reorder: Chưa phân công (placeholder) first, then other departments
+  // Reorder: placeholder first, then other departments
   const orderedDepartments = [
     ...departments.filter((d) => d.is_placeholder),
     ...departments.filter((d) => !d.is_placeholder),

@@ -60,7 +60,7 @@ def list_sub_departments(
         )
     else:
         sub_depts = sub_department_repo.get_all_sub_departments(db)
-    # Loại trừ placeholder sub-department (bộ phận 'Chưa phân công' không có ban con)
+    # Exclude placeholder sub-departments
     return [_sub_to_dict(s) for s in sub_depts if not s.is_placeholder]
 
 
