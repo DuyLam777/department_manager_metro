@@ -12,7 +12,7 @@ class SubDepartment(Base):
     name = Column(String, nullable=False)
     description = Column(String, nullable=True)
     profile_img = Column(String, nullable=True)
-    floor = Column(String, nullable=True)
+    location = Column(String, nullable=True)
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
     is_placeholder = Column(Boolean, default=False, nullable=False)
     deleted = Column(Boolean, default=False, nullable=False)

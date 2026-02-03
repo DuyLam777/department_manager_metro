@@ -24,9 +24,11 @@ export function ManageDepartmentsModal({ token, onClose, onSaved }) {
   const [deptName, setDeptName] = useState("");
   const [deptDescription, setDeptDescription] = useState("");
   const [deptProfileImg, setDeptProfileImg] = useState("");
+  const [deptLocation, setDeptLocation] = useState("");
   const [subName, setSubName] = useState("");
   const [subDescription, setSubDescription] = useState("");
   const [subProfileImg, setSubProfileImg] = useState("");
+  const [subLocation, setSubLocation] = useState("");
   const [subDepartmentId, setSubDepartmentId] = useState("");
   const [cropImageSrc, setCropImageSrc] = useState(null);
   const cropTargetRef = useRef(null);
@@ -59,9 +61,14 @@ export function ManageDepartmentsModal({ token, onClose, onSaved }) {
   }, []);
 
   const unassignedUsers = users.filter(
-    (u) => u.effective_department === "Chưa phân công",
+    (u) => (u.effective_bo_phan || u.effective_department) === "Chưa phân công",
   );
   const placeholderDeptId = departments.find((d) => d.is_placeholder)?.id;
+  // Reorder: Chưa phân công (placeholder) first, then other departments
+  const orderedDepartments = [
+    ...departments.filter((d) => d.is_placeholder),
+    ...departments.filter((d) => !d.is_placeholder),
+  ];
   // Users directly in the department being edited (department_id set, no sub_department)
   const currentDepartmentUsers = editingDepartmentId
     ? users.filter(
@@ -82,9 +89,11 @@ export function ManageDepartmentsModal({ token, onClose, onSaved }) {
     setDeptName("");
     setDeptDescription("");
     setDeptProfileImg("");
+    setDeptLocation("");
     setSubName("");
     setSubDescription("");
     setSubProfileImg("");
+    setSubLocation("");
     setSubDepartmentId("");
   };
 
@@ -95,104 +104,6 @@ export function ManageDepartmentsModal({ token, onClose, onSaved }) {
       else next.add(userId);
       return next;
     });
-  };
-
-  const handleSaveDepartmentAssignments = async () => {
-    if (!editingDepartmentId || !placeholderDeptId) return;
-    setSaving(true);
-    setError(null);
-    try {
-      const currentIds = users
-        .filter(
-          (u) =>
-            u.department_id === editingDepartmentId && !u.sub_department_id,
-        )
-        .map((u) => u.id);
-      const toUnassign = currentIds.filter(
-        (id) => !selectedUserIdsToAdd.has(id),
-      );
-      const toAssign = [...selectedUserIdsToAdd];
-      const assignResults = await Promise.all(
-        toAssign.map((userId) =>
-          fetch(`${API}/users/${userId}`, {
-            method: "PUT",
-            headers: authHeaders(),
-            body: JSON.stringify({
-              department_id: editingDepartmentId,
-              sub_department_id: null,
-            }),
-          }).then((r) => r.ok),
-        ),
-      );
-      const unassignResults = await Promise.all(
-        toUnassign.map((userId) =>
-          fetch(`${API}/users/${userId}`, {
-            method: "PUT",
-            headers: authHeaders(),
-            body: JSON.stringify({
-              department_id: placeholderDeptId,
-              sub_department_id: null,
-            }),
-          }).then((r) => r.ok),
-        ),
-      );
-      if (assignResults.some((ok) => !ok))
-        throw new Error("Không thể gán một số người dùng");
-      if (unassignResults.some((ok) => !ok))
-        throw new Error("Không thể bỏ gán một số người dùng");
-      await fetchDepartments();
-      onSaved?.();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleSaveSubDepartmentAssignments = async () => {
-    if (!editingSubId || !placeholderDeptId) return;
-    setSaving(true);
-    setError(null);
-    try {
-      const currentIds = users
-        .filter((u) => u.sub_department_id === editingSubId)
-        .map((u) => u.id);
-      const toUnassign = currentIds.filter(
-        (id) => !selectedUserIdsToAdd.has(id),
-      );
-      const toAssign = [...selectedUserIdsToAdd];
-      const assignResults = await Promise.all(
-        toAssign.map((userId) =>
-          fetch(`${API}/users/${userId}`, {
-            method: "PUT",
-            headers: authHeaders(),
-            body: JSON.stringify({ sub_department_id: editingSubId }),
-          }).then((r) => r.ok),
-        ),
-      );
-      const unassignResults = await Promise.all(
-        toUnassign.map((userId) =>
-          fetch(`${API}/users/${userId}`, {
-            method: "PUT",
-            headers: authHeaders(),
-            body: JSON.stringify({
-              department_id: placeholderDeptId,
-              sub_department_id: null,
-            }),
-          }).then((r) => r.ok),
-        ),
-      );
-      if (assignResults.some((ok) => !ok))
-        throw new Error("Không thể gán một số người dùng");
-      if (unassignResults.some((ok) => !ok))
-        throw new Error("Không thể bỏ gán một số người dùng");
-      await fetchDepartments();
-      onSaved?.();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSaving(false);
-    }
   };
 
   const handleClose = () => {
@@ -217,6 +128,7 @@ export function ManageDepartmentsModal({ token, onClose, onSaved }) {
           name: deptName.trim(),
           description: deptDescription.trim() || null,
           profile_img: deptProfileImg || null,
+          location: deptLocation.trim() || null,
         }),
       });
       if (!res.ok) {
@@ -255,6 +167,7 @@ export function ManageDepartmentsModal({ token, onClose, onSaved }) {
     setSaving(true);
     setError(null);
     try {
+      // Update department info
       const res = await fetch(`${API}/departments/${editingDepartmentId}`, {
         method: "PUT",
         headers: authHeaders(),
@@ -262,12 +175,58 @@ export function ManageDepartmentsModal({ token, onClose, onSaved }) {
           name: deptName.trim(),
           description: deptDescription.trim() || null,
           profile_img: deptProfileImg || null,
+          location: deptLocation.trim() || null,
         }),
       });
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.detail || "Cập nhật bộ phận thất bại");
       }
+
+      // Update user assignments
+      if (placeholderDeptId) {
+        const currentIds = users
+          .filter(
+            (u) =>
+              u.department_id === editingDepartmentId && !u.sub_department_id,
+          )
+          .map((u) => u.id);
+        const toUnassign = currentIds.filter(
+          (id) => !selectedUserIdsToAdd.has(id),
+        );
+        const toAssign = [...selectedUserIdsToAdd].filter(
+          (id) => !currentIds.includes(id),
+        );
+        const assignResults = await Promise.all(
+          toAssign.map((userId) =>
+            fetch(`${API}/users/${userId}`, {
+              method: "PUT",
+              headers: authHeaders(),
+              body: JSON.stringify({
+                department_id: editingDepartmentId,
+                sub_department_id: null,
+              }),
+            }).then((r) => r.ok),
+          ),
+        );
+        const unassignResults = await Promise.all(
+          toUnassign.map((userId) =>
+            fetch(`${API}/users/${userId}`, {
+              method: "PUT",
+              headers: authHeaders(),
+              body: JSON.stringify({
+                department_id: placeholderDeptId,
+                sub_department_id: null,
+              }),
+            }).then((r) => r.ok),
+          ),
+        );
+        if (assignResults.some((ok) => !ok))
+          throw new Error("Không thể gán một số người dùng");
+        if (unassignResults.some((ok) => !ok))
+          throw new Error("Không thể bỏ gán một số người dùng");
+      }
+
       await fetchDepartments();
       onSaved?.();
       resetForms();
@@ -319,6 +278,7 @@ export function ManageDepartmentsModal({ token, onClose, onSaved }) {
           name: subName.trim(),
           description: subDescription.trim() || null,
           profile_img: subProfileImg || null,
+          location: subLocation.trim() || null,
           department_id: parseInt(addSubForDeptId, 10),
         }),
       });
@@ -346,6 +306,7 @@ export function ManageDepartmentsModal({ token, onClose, onSaved }) {
       setSubName("");
       setSubDescription("");
       setSubProfileImg("");
+      setSubLocation("");
       setSelectedUserIdsToAdd(new Set());
     } catch (err) {
       setError(err.message);
@@ -360,6 +321,7 @@ export function ManageDepartmentsModal({ token, onClose, onSaved }) {
     setSaving(true);
     setError(null);
     try {
+      // Update sub-department info
       const res = await fetch(`${API}/sub-departments/${editingSubId}`, {
         method: "PUT",
         headers: authHeaders(),
@@ -367,6 +329,7 @@ export function ManageDepartmentsModal({ token, onClose, onSaved }) {
           name: subName.trim(),
           description: subDescription.trim() || null,
           profile_img: subProfileImg || null,
+          location: subLocation.trim() || null,
           department_id: subDepartmentId
             ? parseInt(subDepartmentId, 10)
             : undefined,
@@ -376,6 +339,45 @@ export function ManageDepartmentsModal({ token, onClose, onSaved }) {
         const data = await res.json();
         throw new Error(data.detail || "Cập nhật ban thất bại");
       }
+
+      // Update user assignments
+      if (placeholderDeptId) {
+        const currentIds = users
+          .filter((u) => u.sub_department_id === editingSubId)
+          .map((u) => u.id);
+        const toUnassign = currentIds.filter(
+          (id) => !selectedUserIdsToAdd.has(id),
+        );
+        const toAssign = [...selectedUserIdsToAdd].filter(
+          (id) => !currentIds.includes(id),
+        );
+        const assignResults = await Promise.all(
+          toAssign.map((userId) =>
+            fetch(`${API}/users/${userId}`, {
+              method: "PUT",
+              headers: authHeaders(),
+              body: JSON.stringify({ sub_department_id: editingSubId }),
+            }).then((r) => r.ok),
+          ),
+        );
+        const unassignResults = await Promise.all(
+          toUnassign.map((userId) =>
+            fetch(`${API}/users/${userId}`, {
+              method: "PUT",
+              headers: authHeaders(),
+              body: JSON.stringify({
+                department_id: placeholderDeptId,
+                sub_department_id: null,
+              }),
+            }).then((r) => r.ok),
+          ),
+        );
+        if (assignResults.some((ok) => !ok))
+          throw new Error("Không thể gán một số người dùng");
+        if (unassignResults.some((ok) => !ok))
+          throw new Error("Không thể bỏ gán một số người dùng");
+      }
+
       await fetchDepartments();
       onSaved?.();
       resetForms();
@@ -420,6 +422,7 @@ export function ManageDepartmentsModal({ token, onClose, onSaved }) {
     setDeptName(dept.name);
     setDeptDescription(dept.description || "");
     setDeptProfileImg(dept.profile_img || "");
+    setDeptLocation(dept.location || "");
     const currentIds = users
       .filter((u) => u.department_id === dept.id && !u.sub_department_id)
       .map((u) => u.id);
@@ -432,6 +435,7 @@ export function ManageDepartmentsModal({ token, onClose, onSaved }) {
     setSubName(sub.name);
     setSubDescription(sub.description || "");
     setSubProfileImg(sub.profile_img || "");
+    setSubLocation(sub.location || "");
     setSubDepartmentId(String(sub.department_id));
     const currentIds = users
       .filter((u) => u.sub_department_id === sub.id)
@@ -644,6 +648,15 @@ export function ManageDepartmentsModal({ token, onClose, onSaved }) {
                     />
                   </div>
                   <div className="form-group">
+                    <label>Vị trí</label>
+                    <input
+                      type="text"
+                      value={deptLocation}
+                      onChange={(e) => setDeptLocation(e.target.value)}
+                      placeholder="VD: Tầng 3 - Phòng 301"
+                    />
+                  </div>
+                  <div className="form-group">
                     <label>Hình ảnh</label>
                     <div className="dept-img-upload">
                       {deptProfileImg && (
@@ -740,7 +753,7 @@ export function ManageDepartmentsModal({ token, onClose, onSaved }) {
               </button>
             )}
 
-            {departments.map((dept) => (
+            {orderedDepartments.map((dept) => (
               <div key={dept.id} className="manage-dept-card-wrapper">
                 {/* Drop indicator before */}
                 {dropIndicator?.deptId === dept.id &&
@@ -786,6 +799,15 @@ export function ManageDepartmentsModal({ token, onClose, onSaved }) {
                           />
                         </div>
                         <div className="form-group">
+                          <label>Vị trí</label>
+                          <input
+                            type="text"
+                            value={deptLocation}
+                            onChange={(e) => setDeptLocation(e.target.value)}
+                            placeholder="VD: Tầng 3 - Phòng 301"
+                          />
+                        </div>
+                        <div className="form-group">
                           <label>Hình ảnh</label>
                           <div className="dept-img-upload">
                             {deptProfileImg && (
@@ -817,6 +839,96 @@ export function ManageDepartmentsModal({ token, onClose, onSaved }) {
                             )}
                           </div>
                         </div>
+                        {!dept.is_placeholder &&
+                          (unassignedUsers.length > 0 ||
+                            currentDepartmentUsers.length > 0) && (
+                            <div className="manage-dept-add-users">
+                              <h4>
+                                Gán người dùng vào {deptName || dept.name}
+                              </h4>
+                              {unassignedUsers.length > 0 && (
+                                <>
+                                  <p className="manage-dept-user-group-label">
+                                    Chưa phân công
+                                  </p>
+                                  <ul className="unassigned-users-list">
+                                    {unassignedUsers.map((u) => {
+                                      const displayName =
+                                        [u.first_name, u.last_name]
+                                          .filter(Boolean)
+                                          .join(" ") || u.username;
+                                      return (
+                                        <li key={u.id}>
+                                          <label className="unassigned-user-row">
+                                            <input
+                                              type="checkbox"
+                                              checked={selectedUserIdsToAdd.has(
+                                                u.id,
+                                              )}
+                                              onChange={() =>
+                                                toggleUserToAdd(u.id)
+                                              }
+                                            />
+                                            <span>
+                                              {displayName}
+                                              {displayName !== u.username &&
+                                              u.username
+                                                ? ` (${u.username})`
+                                                : ""}
+                                            </span>
+                                          </label>
+                                        </li>
+                                      );
+                                    })}
+                                  </ul>
+                                </>
+                              )}
+                              {unassignedUsers.length > 0 &&
+                                currentDepartmentUsers.length > 0 && (
+                                  <div
+                                    className="manage-dept-user-separator"
+                                    aria-hidden="true"
+                                  />
+                                )}
+                              {currentDepartmentUsers.length > 0 && (
+                                <>
+                                  <p className="manage-dept-user-group-label">
+                                    Hiện đang trong {deptName || dept.name}
+                                  </p>
+                                  <ul className="unassigned-users-list">
+                                    {currentDepartmentUsers.map((u) => {
+                                      const displayName =
+                                        [u.first_name, u.last_name]
+                                          .filter(Boolean)
+                                          .join(" ") || u.username;
+                                      return (
+                                        <li key={u.id}>
+                                          <label className="unassigned-user-row">
+                                            <input
+                                              type="checkbox"
+                                              checked={selectedUserIdsToAdd.has(
+                                                u.id,
+                                              )}
+                                              onChange={() =>
+                                                toggleUserToAdd(u.id)
+                                              }
+                                            />
+                                            <span>
+                                              {displayName}
+                                              {displayName !== u.username &&
+                                              u.username
+                                                ? ` (${u.username})`
+                                                : ""}
+                                            </span>
+                                          </label>
+                                        </li>
+                                      );
+                                    })}
+                                  </ul>
+                                </>
+                              )}
+                            </div>
+                          )}
                         <div className="form-actions">
                           <button
                             type="button"
@@ -834,102 +946,6 @@ export function ManageDepartmentsModal({ token, onClose, onSaved }) {
                           </button>
                         </div>
                       </form>
-                      {!dept.is_placeholder &&
-                        (unassignedUsers.length > 0 ||
-                          currentDepartmentUsers.length > 0) && (
-                          <div className="manage-dept-add-users">
-                            <h4>Gán người dùng vào {deptName || dept.name}</h4>
-                            {unassignedUsers.length > 0 && (
-                              <>
-                                <p className="manage-dept-user-group-label">
-                                  Chưa phân công
-                                </p>
-                                <ul className="unassigned-users-list">
-                                  {unassignedUsers.map((u) => {
-                                    const displayName =
-                                      [u.first_name, u.last_name]
-                                        .filter(Boolean)
-                                        .join(" ") || u.username;
-                                    return (
-                                      <li key={u.id}>
-                                        <label className="unassigned-user-row">
-                                          <input
-                                            type="checkbox"
-                                            checked={selectedUserIdsToAdd.has(
-                                              u.id,
-                                            )}
-                                            onChange={() =>
-                                              toggleUserToAdd(u.id)
-                                            }
-                                          />
-                                          <span>
-                                            {displayName}
-                                            {displayName !== u.username &&
-                                            u.username
-                                              ? ` (${u.username})`
-                                              : ""}
-                                          </span>
-                                        </label>
-                                      </li>
-                                    );
-                                  })}
-                                </ul>
-                              </>
-                            )}
-                            {unassignedUsers.length > 0 &&
-                              currentDepartmentUsers.length > 0 && (
-                                <div
-                                  className="manage-dept-user-separator"
-                                  aria-hidden="true"
-                                />
-                              )}
-                            {currentDepartmentUsers.length > 0 && (
-                              <>
-                                <p className="manage-dept-user-group-label">
-                                  Hiện đang trong {deptName || dept.name}
-                                </p>
-                                <ul className="unassigned-users-list">
-                                  {currentDepartmentUsers.map((u) => {
-                                    const displayName =
-                                      [u.first_name, u.last_name]
-                                        .filter(Boolean)
-                                        .join(" ") || u.username;
-                                    return (
-                                      <li key={u.id}>
-                                        <label className="unassigned-user-row">
-                                          <input
-                                            type="checkbox"
-                                            checked={selectedUserIdsToAdd.has(
-                                              u.id,
-                                            )}
-                                            onChange={() =>
-                                              toggleUserToAdd(u.id)
-                                            }
-                                          />
-                                          <span>
-                                            {displayName}
-                                            {displayName !== u.username &&
-                                            u.username
-                                              ? ` (${u.username})`
-                                              : ""}
-                                          </span>
-                                        </label>
-                                      </li>
-                                    );
-                                  })}
-                                </ul>
-                              </>
-                            )}
-                            <button
-                              type="button"
-                              className="btn-add-users-to-dept"
-                              onClick={handleSaveDepartmentAssignments}
-                              disabled={saving}
-                            >
-                              {saving ? "Đang lưu..." : "Lưu phân công"}
-                            </button>
-                          </div>
-                        )}
                     </div>
                   ) : (
                     <div className="manage-dept-row">
@@ -1002,6 +1018,15 @@ export function ManageDepartmentsModal({ token, onClose, onSaved }) {
                             type="text"
                             value={subDescription}
                             onChange={(e) => setSubDescription(e.target.value)}
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label>Vị trí</label>
+                          <input
+                            type="text"
+                            value={subLocation}
+                            onChange={(e) => setSubLocation(e.target.value)}
+                            placeholder="VD: Tầng 3 - Phòng 301"
                           />
                         </div>
                         <div className="form-group">
@@ -1100,7 +1125,7 @@ export function ManageDepartmentsModal({ token, onClose, onSaved }) {
                           setSelectedUserIdsToAdd(new Set());
                         }}
                       >
-                        + Thêm ban
+                        + Thêm
                       </button>
                     )}
 
@@ -1127,6 +1152,17 @@ export function ManageDepartmentsModal({ token, onClose, onSaved }) {
                                   onChange={(e) =>
                                     setSubDescription(e.target.value)
                                   }
+                                />
+                              </div>
+                              <div className="form-group">
+                                <label>Vị trí</label>
+                                <input
+                                  type="text"
+                                  value={subLocation}
+                                  onChange={(e) =>
+                                    setSubLocation(e.target.value)
+                                  }
+                                  placeholder="VD: Tầng 3 - Phòng 301"
                                 />
                               </div>
                               <div className="form-group">
@@ -1162,7 +1198,7 @@ export function ManageDepartmentsModal({ token, onClose, onSaved }) {
                                 </div>
                               </div>
                               <div className="form-group">
-                                <label>bộ phận</label>
+                                <label>Bộ phận</label>
                                 <select
                                   value={subDepartmentId}
                                   onChange={(e) =>
@@ -1178,6 +1214,96 @@ export function ManageDepartmentsModal({ token, onClose, onSaved }) {
                                     ))}
                                 </select>
                               </div>
+                              {!sub.is_placeholder &&
+                                (unassignedUsers.length > 0 ||
+                                  currentSubUsers.length > 0) && (
+                                  <div className="manage-dept-add-users">
+                                    <h4>
+                                      Gán người dùng vào {subName || sub.name}
+                                    </h4>
+                                    {unassignedUsers.length > 0 && (
+                                      <>
+                                        <p className="manage-dept-user-group-label">
+                                          Chưa phân công
+                                        </p>
+                                        <ul className="unassigned-users-list">
+                                          {unassignedUsers.map((u) => {
+                                            const displayName =
+                                              [u.first_name, u.last_name]
+                                                .filter(Boolean)
+                                                .join(" ") || u.username;
+                                            return (
+                                              <li key={u.id}>
+                                                <label className="unassigned-user-row">
+                                                  <input
+                                                    type="checkbox"
+                                                    checked={selectedUserIdsToAdd.has(
+                                                      u.id,
+                                                    )}
+                                                    onChange={() =>
+                                                      toggleUserToAdd(u.id)
+                                                    }
+                                                  />
+                                                  <span>
+                                                    {displayName}
+                                                    {displayName !==
+                                                      u.username && u.username
+                                                      ? ` (${u.username})`
+                                                      : ""}
+                                                  </span>
+                                                </label>
+                                              </li>
+                                            );
+                                          })}
+                                        </ul>
+                                      </>
+                                    )}
+                                    {unassignedUsers.length > 0 &&
+                                      currentSubUsers.length > 0 && (
+                                        <div
+                                          className="manage-dept-user-separator"
+                                          aria-hidden="true"
+                                        />
+                                      )}
+                                    {currentSubUsers.length > 0 && (
+                                      <>
+                                        <p className="manage-dept-user-group-label">
+                                          Hiện đang trong {subName || sub.name}
+                                        </p>
+                                        <ul className="unassigned-users-list">
+                                          {currentSubUsers.map((u) => {
+                                            const displayName =
+                                              [u.first_name, u.last_name]
+                                                .filter(Boolean)
+                                                .join(" ") || u.username;
+                                            return (
+                                              <li key={u.id}>
+                                                <label className="unassigned-user-row">
+                                                  <input
+                                                    type="checkbox"
+                                                    checked={selectedUserIdsToAdd.has(
+                                                      u.id,
+                                                    )}
+                                                    onChange={() =>
+                                                      toggleUserToAdd(u.id)
+                                                    }
+                                                  />
+                                                  <span>
+                                                    {displayName}
+                                                    {displayName !==
+                                                      u.username && u.username
+                                                      ? ` (${u.username})`
+                                                      : ""}
+                                                  </span>
+                                                </label>
+                                              </li>
+                                            );
+                                          })}
+                                        </ul>
+                                      </>
+                                    )}
+                                  </div>
+                                )}
                               <div className="form-actions">
                                 <button
                                   type="button"
@@ -1195,104 +1321,6 @@ export function ManageDepartmentsModal({ token, onClose, onSaved }) {
                                 </button>
                               </div>
                             </form>
-                            {!sub.is_placeholder &&
-                              (unassignedUsers.length > 0 ||
-                                currentSubUsers.length > 0) && (
-                                <div className="manage-dept-add-users">
-                                  <h4>
-                                    Gán người dùng vào {subName || sub.name}
-                                  </h4>
-                                  {unassignedUsers.length > 0 && (
-                                    <>
-                                      <p className="manage-dept-user-group-label">
-                                        Chưa phân công
-                                      </p>
-                                      <ul className="unassigned-users-list">
-                                        {unassignedUsers.map((u) => {
-                                          const displayName =
-                                            [u.first_name, u.last_name]
-                                              .filter(Boolean)
-                                              .join(" ") || u.username;
-                                          return (
-                                            <li key={u.id}>
-                                              <label className="unassigned-user-row">
-                                                <input
-                                                  type="checkbox"
-                                                  checked={selectedUserIdsToAdd.has(
-                                                    u.id,
-                                                  )}
-                                                  onChange={() =>
-                                                    toggleUserToAdd(u.id)
-                                                  }
-                                                />
-                                                <span>
-                                                  {displayName}
-                                                  {displayName !== u.username &&
-                                                  u.username
-                                                    ? ` (${u.username})`
-                                                    : ""}
-                                                </span>
-                                              </label>
-                                            </li>
-                                          );
-                                        })}
-                                      </ul>
-                                    </>
-                                  )}
-                                  {unassignedUsers.length > 0 &&
-                                    currentSubUsers.length > 0 && (
-                                      <div
-                                        className="manage-dept-user-separator"
-                                        aria-hidden="true"
-                                      />
-                                    )}
-                                  {currentSubUsers.length > 0 && (
-                                    <>
-                                      <p className="manage-dept-user-group-label">
-                                        Hiện đang trong {subName || sub.name}
-                                      </p>
-                                      <ul className="unassigned-users-list">
-                                        {currentSubUsers.map((u) => {
-                                          const displayName =
-                                            [u.first_name, u.last_name]
-                                              .filter(Boolean)
-                                              .join(" ") || u.username;
-                                          return (
-                                            <li key={u.id}>
-                                              <label className="unassigned-user-row">
-                                                <input
-                                                  type="checkbox"
-                                                  checked={selectedUserIdsToAdd.has(
-                                                    u.id,
-                                                  )}
-                                                  onChange={() =>
-                                                    toggleUserToAdd(u.id)
-                                                  }
-                                                />
-                                                <span>
-                                                  {displayName}
-                                                  {displayName !== u.username &&
-                                                  u.username
-                                                    ? ` (${u.username})`
-                                                    : ""}
-                                                </span>
-                                              </label>
-                                            </li>
-                                          );
-                                        })}
-                                      </ul>
-                                    </>
-                                  )}
-                                  <button
-                                    type="button"
-                                    className="btn-add-users-to-dept"
-                                    onClick={handleSaveSubDepartmentAssignments}
-                                    disabled={saving}
-                                  >
-                                    {saving ? "Đang lưu..." : "Lưu phân công"}
-                                  </button>
-                                </div>
-                              )}
                           </div>
                         ) : (
                           <div className="manage-sub-row">

@@ -38,13 +38,24 @@ function App() {
     sidebar_bg_color: "#1f2937",
   });
 
+  // Remove Vietnamese diacritics for accent-insensitive search
+  const removeVietnameseDiacritics = (str) => {
+    if (!str) return "";
+    return str
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d")
+      .replace(/Đ/g, "D");
+  };
+
   // Fuzzy match function - checks if query chars appear in order in target
+  // Supports Vietnamese without accents (e.g., "nhan su" matches "Nhân sự")
   const fuzzyMatch = (query, target) => {
     if (!query) return true;
     if (!target) return false;
 
-    const q = query.toLowerCase();
-    const t = target.toLowerCase();
+    const q = removeVietnameseDiacritics(query.toLowerCase());
+    const t = removeVietnameseDiacritics(target.toLowerCase());
 
     let qi = 0;
     for (let ti = 0; ti < t.length && qi < q.length; ti++) {
@@ -61,7 +72,14 @@ function App() {
       fuzzyMatch(departmentSearchQuery, sub.name),
     );
   };
-  const filteredDepartments = departments.filter(departmentMatchesSearch);
+  // Reorder: Chưa phân công (placeholder) first, then other departments
+  const reorderedDepartments = [
+    ...departments.filter((d) => d.is_placeholder),
+    ...departments.filter((d) => !d.is_placeholder),
+  ];
+  const filteredDepartments = reorderedDepartments.filter(
+    departmentMatchesSearch,
+  );
 
   // Check if user matches search query
   const matchesSearch = (u) => {
@@ -334,7 +352,7 @@ function App() {
                         type: "department",
                         id: dept.id,
                         name: dept.name,
-                        floor: dept.floor,
+                        location: dept.location,
                       });
                       fetchUsersForFilter({
                         type: "department",
@@ -394,7 +412,7 @@ function App() {
                               type: "sub",
                               id: sub.id,
                               name: sub.name,
-                              floor: sub.floor,
+                              location: sub.location,
                             };
                             setSelectedFilter(filter);
                             fetchUsersForFilter(filter);
@@ -446,7 +464,7 @@ function App() {
                           type: "department",
                           id: dept.id,
                           name: dept.name,
-                          floor: dept.floor,
+                          location: dept.location,
                         });
                         fetchUsersForFilter({
                           type: "department",
@@ -483,7 +501,7 @@ function App() {
                                 type: "sub",
                                 id: sub.id,
                                 name: sub.name,
-                                floor: sub.floor,
+                                location: sub.location,
                               };
                               setSelectedFilter(filter);
                               fetchUsersForFilter(filter);
@@ -508,8 +526,8 @@ function App() {
             <>
               <div className="content-header">
                 <h1>
-                  {selectedFilter.floor
-                    ? `${selectedFilter.name} - ${selectedFilter.floor}`
+                  {selectedFilter.location
+                    ? `${selectedFilter.name} - ${selectedFilter.location}`
                     : selectedFilter.name}
                 </h1>
                 <div className="header-actions">

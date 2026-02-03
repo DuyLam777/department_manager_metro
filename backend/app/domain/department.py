@@ -12,7 +12,7 @@ class Department(Base):
     name = Column(String, unique=True, nullable=False)
     description = Column(String, nullable=True)
     profile_img = Column(String, nullable=True)
-    floor = Column(String, nullable=True)
+    location = Column(String, nullable=True)
     is_placeholder = Column(Boolean, default=False, nullable=False)
     display_order = Column(Integer, default=0, nullable=False)
     deleted = Column(Boolean, default=False, nullable=False)

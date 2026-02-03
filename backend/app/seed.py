@@ -65,19 +65,19 @@ def seed_data(db: Session):
     engineering = Department(
         name="Kỹ thuật",
         description="Đội phát triển phần mềm",
-        floor="Tầng 3",
+        location="Tầng 3",
         is_placeholder=False,
     )
     hr = Department(
         name="Nhân sự",
         description="Đội nhân sự",
-        floor="Tầng 2",
+        location="Tầng 2",
         is_placeholder=False,
     )
     sales = Department(
         name="Bán hàng",
         description="Đội bán hàng và tiếp thị",
-        floor="Tầng 1",
+        location="Tầng 1",
         is_placeholder=False,
     )
 
@@ -88,19 +88,19 @@ def seed_data(db: Session):
     backend = SubDepartment(
         name="Phát triển Backend",
         description="Phát triển phía server / backend",
-        floor="Tầng 3 - Phòng 301",
+        location="Tầng 3 - Phòng 301",
         department_id=engineering.id,
     )
     frontend = SubDepartment(
         name="Phát triển Frontend",
         description="Phát triển giao diện / frontend",
-        floor="Tầng 3 - Phòng 302",
+        location="Tầng 3 - Phòng 302",
         department_id=engineering.id,
     )
     recruitment = SubDepartment(
         name="Tuyển dụng",
         description="Đội tuyển dụng",
-        floor="Tầng 2 - Phòng 201",
+        location="Tầng 2 - Phòng 201",
         department_id=hr.id,
     )
 

@@ -17,7 +17,7 @@ class SubDepartmentCreateRequest(BaseModel):
     name: str
     description: str | None = None
     profile_img: str | None = None
-    floor: str | None = None
+    location: str | None = None
     department_id: int
 
 
@@ -25,7 +25,7 @@ class SubDepartmentUpdateRequest(BaseModel):
     name: str | None = None
     description: str | None = None
     profile_img: str | None = None
-    floor: str | None = None
+    location: str | None = None
     department_id: int | None = None
 
 
@@ -40,7 +40,7 @@ def _sub_to_dict(sub: SubDepartment) -> dict:
         "name": sub.name,
         "description": sub.description,
         "profile_img": sub.profile_img,
-        "floor": sub.floor,
+        "location": sub.location,
         "department_id": sub.department_id,
         "department_name": sub.department.name if sub.department else None,
         "is_placeholder": sub.is_placeholder,
@@ -171,7 +171,7 @@ def create_sub_department(
         name=request.name,
         description=request.description,
         profile_img=request.profile_img,
-        floor=request.floor,
+        location=request.location,
         department_id=request.department_id,
         is_placeholder=False,
         deleted=False,
@@ -210,8 +210,8 @@ def update_sub_department(
         sub.description = request.description
     if request.profile_img is not None:
         sub.profile_img = request.profile_img
-    if request.floor is not None:
-        sub.floor = request.floor
+    if request.location is not None:
+        sub.location = request.location
     if request.department_id is not None:
         dept = department_repo.get_department_by_id(db, request.department_id)
         if not dept:

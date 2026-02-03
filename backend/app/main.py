@@ -31,16 +31,30 @@ def run_migrations(db):
         )
         db.commit()
 
-    # Migration: Add floor column to departments table
-    if "floor" not in dept_columns:
-        db.execute(text("ALTER TABLE departments ADD COLUMN floor TEXT"))
+    # Migration: Add location column to departments table (renamed from floor)
+    if "location" not in dept_columns:
+        db.execute(text("ALTER TABLE departments ADD COLUMN location TEXT"))
         db.commit()
+        # Copy data from floor to location if floor exists
+        if "floor" in dept_columns:
+            db.execute(
+                text("UPDATE departments SET location = floor WHERE floor IS NOT NULL")
+            )
+            db.commit()
 
-    # Migration: Add floor column to sub_departments table
+    # Migration: Add location column to sub_departments table (renamed from floor)
     sub_dept_columns = [col["name"] for col in inspector.get_columns("sub_departments")]
-    if "floor" not in sub_dept_columns:
-        db.execute(text("ALTER TABLE sub_departments ADD COLUMN floor TEXT"))
+    if "location" not in sub_dept_columns:
+        db.execute(text("ALTER TABLE sub_departments ADD COLUMN location TEXT"))
         db.commit()
+        # Copy data from floor to location if floor exists
+        if "floor" in sub_dept_columns:
+            db.execute(
+                text(
+                    "UPDATE sub_departments SET location = floor WHERE floor IS NOT NULL"
+                )
+            )
+            db.commit()
 
 
 @asynccontextmanager

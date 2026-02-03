@@ -18,14 +18,14 @@ class DepartmentCreateRequest(BaseModel):
     name: str
     description: str | None = None
     profile_img: str | None = None
-    floor: str | None = None
+    location: str | None = None
 
 
 class DepartmentUpdateRequest(BaseModel):
     name: str | None = None
     description: str | None = None
     profile_img: str | None = None
-    floor: str | None = None
+    location: str | None = None
 
 
 class DepartmentReorderRequest(BaseModel):
@@ -65,7 +65,7 @@ def list_departments(db: Session = Depends(get_db)):
             "name": d.name,
             "description": d.description,
             "profile_img": d.profile_img,
-            "floor": d.floor,
+            "location": d.location,
             "is_placeholder": d.is_placeholder,
             "user_count": _department_user_count(d),
             "direct_user_count": len(_active_users(d.users)),
@@ -75,7 +75,7 @@ def list_departments(db: Session = Depends(get_db)):
                     "name": s.name,
                     "description": s.description,
                     "profile_img": s.profile_img,
-                    "floor": s.floor,
+                    "location": s.location,
                     "user_count": len(_active_users(s.users)),
                 }
                 for s in _active_sub_departments(d)
@@ -203,7 +203,7 @@ def get_department(department_id: int, db: Session = Depends(get_db)):
         "name": dept.name,
         "description": dept.description,
         "profile_img": dept.profile_img,
-        "floor": dept.floor,
+        "location": dept.location,
         "is_placeholder": dept.is_placeholder,
         "user_count": _department_user_count(dept),
         "direct_user_count": len(_active_users(dept.users)),
@@ -237,7 +237,7 @@ def create_department(
         name=request.name,
         description=request.description,
         profile_img=request.profile_img,
-        floor=request.floor,
+        location=request.location,
         is_placeholder=False,
         deleted=False,
     )
@@ -249,7 +249,7 @@ def create_department(
         "name": dept.name,
         "description": dept.description,
         "profile_img": dept.profile_img,
-        "floor": dept.floor,
+        "location": dept.location,
         "is_placeholder": dept.is_placeholder,
         "user_count": 0,
         "direct_user_count": 0,
@@ -287,8 +287,8 @@ def update_department(
         dept.description = request.description
     if request.profile_img is not None:
         dept.profile_img = request.profile_img
-    if request.floor is not None:
-        dept.floor = request.floor
+    if request.location is not None:
+        dept.location = request.location
     db.commit()
     db.refresh(dept)
     return {
@@ -296,7 +296,7 @@ def update_department(
         "name": dept.name,
         "description": dept.description,
         "profile_img": dept.profile_img,
-        "floor": dept.floor,
+        "location": dept.location,
         "is_placeholder": dept.is_placeholder,
         "user_count": _department_user_count(dept),
         "direct_user_count": len(_active_users(dept.users)),
