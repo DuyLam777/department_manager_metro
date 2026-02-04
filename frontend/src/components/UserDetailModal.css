@@ -293,6 +293,60 @@
     font-weight: 500;
 }
 
+/* Set Password Form (for self-edit) */
+.set-password-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.password-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.password-input-group input {
+    padding: 0.625rem 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    font-size: 0.95rem;
+}
+
+.password-input-group input:focus {
+    outline: none;
+    border-color: #4f46e5;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.btn-set-password {
+    padding: 0.5rem 1rem;
+    background-color: #059669;
+    color: white;
+    border: none;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    align-self: flex-start;
+}
+
+.btn-set-password:hover:not(:disabled) {
+    background-color: #047857;
+}
+
+.btn-set-password:disabled {
+    background-color: #9ca3af;
+    cursor: not-allowed;
+}
+
+.password-success {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #059669;
+    font-weight: 500;
+}
+
 /* Danger Zone */
 .danger-zone {
     margin-bottom: 1rem;

@@ -4,6 +4,7 @@ import "./UserDetailModal.css";
 
 export function UserDetailModal({
   userId,
+  currentUserId,
   departments,
   isAdmin,
   token,
@@ -19,6 +20,12 @@ export function UserDetailModal({
   const [error, setError] = useState(null);
   const [newPassword, setNewPassword] = useState(null);
 
+  // State for custom password setting (only for self-edit)
+  const [customPassword, setCustomPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [settingPassword, setSettingPassword] = useState(false);
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
+
   // Original values to detect changes
   const [originalValues, setOriginalValues] = useState(null);
 
@@ -31,6 +38,9 @@ export function UserDetailModal({
   const [departmentOrSub, setDepartmentOrSub] = useState("");
   const [position, setPosition] = useState("");
   const [cropImageSrc, setCropImageSrc] = useState(null);
+
+  // Check if editing self
+  const isEditingSelf = userId === currentUserId;
 
   useEffect(() => {
     fetchUser();
@@ -45,7 +55,7 @@ export function UserDetailModal({
       setUser(data);
 
       // Set form values
-      setUsername(data.username);
+      setUsername(data.username || "");
       setEmail(data.email || "");
       setFirstName(data.first_name || "");
       setLastName(data.last_name || "");
@@ -60,7 +70,7 @@ export function UserDetailModal({
 
       // Store original values for change detection
       setOriginalValues({
-        username: data.username,
+        username: data.username || "",
         email: data.email || "",
         firstName: data.first_name || "",
         lastName: data.last_name || "",
@@ -104,7 +114,7 @@ export function UserDetailModal({
     if (firstName || lastName) {
       return `${firstName} ${lastName}`.trim();
     }
-    return username;
+    return username || "Người dùng";
   };
 
   const handleSave = async () => {
@@ -117,22 +127,29 @@ export function UserDetailModal({
           ? [parseInt(departmentOrSub.slice(5), 10), null]
           : [null, null];
 
+      // Only include username for admin users
+      const updateData = {
+        email: email || null,
+        first_name: firstName || null,
+        last_name: lastName || null,
+        profile_img: profileImg || null,
+        department_id: departmentId,
+        sub_department_id: subDepartmentId,
+        position: position || null,
+      };
+
+      // Only update username for admin users (they're the only ones with usernames)
+      if (user?.is_admin) {
+        updateData.username = username;
+      }
+
       const response = await fetch(`/api/users/${userId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          username,
-          email: email || null,
-          first_name: firstName || null,
-          last_name: lastName || null,
-          profile_img: profileImg || null,
-          department_id: departmentId,
-          sub_department_id: subDepartmentId,
-          position: position || null,
-        }),
+        body: JSON.stringify(updateData),
       });
 
       if (!response.ok) {
@@ -151,7 +168,8 @@ export function UserDetailModal({
   };
 
   const handleResetPassword = async () => {
-    if (!confirm(`Bạn có chắc muốn đặt lại mật khẩu cho ${username}?`)) {
+    const name = getDisplayName();
+    if (!confirm(`Bạn có chắc muốn đặt lại mật khẩu cho ${name}?`)) {
       return;
     }
 
@@ -181,6 +199,45 @@ export function UserDetailModal({
 
   const copyPassword = () => {
     navigator.clipboard.writeText(newPassword);
+  };
+
+  const handleSetPassword = async () => {
+    if (customPassword.length < 6) {
+      setError("Mật khẩu phải có ít nhất 6 ký tự");
+      return;
+    }
+    if (customPassword !== confirmPassword) {
+      setError("Mật khẩu xác nhận không khớp");
+      return;
+    }
+
+    setSettingPassword(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/users/${userId}/set-password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ password: customPassword }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.detail || "Đặt mật khẩu thất bại");
+      }
+
+      setPasswordSuccess(true);
+      setCustomPassword("");
+      setConfirmPassword("");
+      // Clear success message after 3 seconds
+      setTimeout(() => setPasswordSuccess(false), 3000);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSettingPassword(false);
+    }
   };
 
   const handleDelete = async () => {
@@ -333,17 +390,20 @@ export function UserDetailModal({
           </div>
         </div>
 
-        <div className="form-group">
-          <label htmlFor="username">Tên đăng nhập</label>
-          <input
-            id="username"
-            type="text"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            disabled={!isAdmin}
-            required
-          />
-        </div>
+        {/* Only show username field for admin users being viewed */}
+        {user?.is_admin && (
+          <div className="form-group">
+            <label htmlFor="username">Tên đăng nhập</label>
+            <input
+              id="username"
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              disabled={!isAdmin}
+              required
+            />
+          </div>
+        )}
 
         <div className="form-group">
           <label htmlFor="email">Email</label>
@@ -389,34 +449,74 @@ export function UserDetailModal({
           </select>
         </div>
 
-        {isAdmin && (
+        {/* Only show password section for admin users being viewed, and only if current user is admin */}
+        {isAdmin && user?.is_admin && (
           <div className="password-reset-section">
             <label>Mật khẩu</label>
-            {newPassword ? (
-              <div className="new-password-display">
-                <code>{newPassword}</code>
+
+            {/* Show custom password form when editing self */}
+            {isEditingSelf && (
+              <div className="set-password-form">
+                <div className="password-input-group">
+                  <input
+                    type="password"
+                    placeholder="Mật khẩu mới"
+                    value={customPassword}
+                    onChange={(e) => setCustomPassword(e.target.value)}
+                  />
+                  <input
+                    type="password"
+                    placeholder="Xác nhận mật khẩu"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                  />
+                </div>
                 <button
                   type="button"
-                  className="btn-copy"
-                  onClick={copyPassword}
+                  className="btn-set-password"
+                  onClick={handleSetPassword}
+                  disabled={
+                    settingPassword || !customPassword || !confirmPassword
+                  }
                 >
-                  Copy
+                  {settingPassword ? "Đang lưu..." : "Đặt mật khẩu"}
                 </button>
+                {passwordSuccess && (
+                  <p className="password-success">Mật khẩu đã được cập nhật!</p>
+                )}
               </div>
-            ) : (
-              <button
-                type="button"
-                className="btn-reset-password"
-                onClick={handleResetPassword}
-                disabled={resetting}
-              >
-                {resetting ? "Đang đặt lại..." : "Đặt lại mật khẩu"}
-              </button>
             )}
-            {newPassword && (
-              <p className="password-warning">
-                Lưu mật khẩu này ngay. Nó sẽ không được hiển thị lại.
-              </p>
+
+            {/* Show reset password button when viewing other admins */}
+            {!isEditingSelf && (
+              <>
+                {newPassword ? (
+                  <div className="new-password-display">
+                    <code>{newPassword}</code>
+                    <button
+                      type="button"
+                      className="btn-copy"
+                      onClick={copyPassword}
+                    >
+                      Copy
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn-reset-password"
+                    onClick={handleResetPassword}
+                    disabled={resetting}
+                  >
+                    {resetting ? "Đang đặt lại..." : "Đặt lại mật khẩu"}
+                  </button>
+                )}
+                {newPassword && (
+                  <p className="password-warning">
+                    Lưu mật khẩu này ngay. Nó sẽ không được hiển thị lại.
+                  </p>
+                )}
+              </>
             )}
           </div>
         )}

@@ -17,13 +17,15 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 
 class UserCreateRequest(BaseModel):
-    username: str
+    username: str | None = None  # Only required for admins
     email: str | None = None
     first_name: str | None = None
     last_name: str | None = None
     profile_img: str | None = None
     department_id: int | None = None
     sub_department_id: int | None = None
+    position: str | None = None
+    is_admin: bool = False  # Whether to create as admin
 
 
 class UserUpdateRequest(BaseModel):
@@ -59,10 +61,11 @@ def user_to_dict(u: User, include_deleted_at: bool = False) -> dict:
     - `department` label renamed to `bo_phan` (Bộ phận).
     - `effective_department` renamed to `effective_bo_phan`.
     - Include `position` (Chức vụ) in responses.
+    - Username is only included for admin users (regular users don't have one).
     """
     result = {
         "id": u.id,
-        "username": u.username,
+        "username": u.username if u.is_admin else None,  # Only admins have username
         "email": u.email,
         "first_name": u.first_name,
         "last_name": u.last_name,
@@ -106,11 +109,17 @@ def list_users(
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_user(request: UserCreateRequest, db: Session = Depends(get_db)):
-    """Create a new user with a randomly generated password. Admin only."""
-    # Check for duplicate username
-    existing = db.query(User).filter(User.username == request.username).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Username already taken")
+    """Create a new user. Admin users get username/password, regular users don't."""
+    # Admin users require username
+    if request.is_admin:
+        if not request.username:
+            raise HTTPException(
+                status_code=400, detail="Username is required for admin users"
+            )
+        # Check for duplicate username
+        existing = db.query(User).filter(User.username == request.username).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Username already taken")
 
     # Check for duplicate email
     if request.email:
@@ -147,33 +156,38 @@ def create_user(request: UserCreateRequest, db: Session = Depends(get_db)):
         if not sub:
             raise HTTPException(status_code=400, detail="Sub-department not found")
 
-    # Generate random password
-    plain_password = generate_random_password()
+    # Only generate password for admin users
+    plain_password = None
+    password_hash = None
+    if request.is_admin:
+        plain_password = generate_random_password()
+        password_hash = hash_password(plain_password)
 
     # Create user (store only one of department_id or sub_department_id)
     user = User(
-        username=request.username,
+        username=request.username if request.is_admin else None,
         email=request.email,
         first_name=request.first_name,
         last_name=request.last_name,
         profile_img=request.profile_img,
-        password_hash=hash_password(plain_password),
+        password_hash=password_hash,
         department_id=request.department_id if request.department_id else None,
         sub_department_id=request.sub_department_id
         if request.sub_department_id
         else None,
-        is_admin=False,
+        position=request.position,
+        is_admin=request.is_admin,
     )
 
     db.add(user)
     db.commit()
     db.refresh(user)
 
-    # Return user data with the generated password (shown once)
-    return {
-        **user_to_dict(user),
-        "generated_password": plain_password,
-    }
+    # Return user data with the generated password (shown once) for admin users
+    result = user_to_dict(user)
+    if request.is_admin and plain_password:
+        result["generated_password"] = plain_password
+    return result
 
 
 @router.get("/{user_id}")
@@ -292,12 +306,22 @@ def update_user(
     return user_to_dict(user)
 
 
+class SetPasswordRequest(BaseModel):
+    password: str
+
+
 @router.post("/{user_id}/reset-password")
 def reset_user_password(user_id: int, db: Session = Depends(get_db)):
-    """Reset a user's password and generate a new one. Admin only."""
+    """Reset an admin user's password and generate a new one. Only works for admin users."""
     user = db.query(User).filter(User.id == user_id, User.deleted == False).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+
+    # Only admin users have passwords
+    if not user.is_admin:
+        raise HTTPException(
+            status_code=400, detail="Only admin users have passwords to reset"
+        )
 
     # Generate new random password
     new_password = generate_random_password()
@@ -309,6 +333,31 @@ def reset_user_password(user_id: int, db: Session = Depends(get_db)):
         "message": "Password reset successfully",
         "new_password": new_password,
     }
+
+
+@router.post("/{user_id}/set-password")
+def set_user_password(
+    user_id: int, request: SetPasswordRequest, db: Session = Depends(get_db)
+):
+    """Set a custom password for an admin user. Only works for admin users."""
+    user = db.query(User).filter(User.id == user_id, User.deleted == False).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Only admin users have passwords
+    if not user.is_admin:
+        raise HTTPException(status_code=400, detail="Only admin users have passwords")
+
+    # Validate password length
+    if len(request.password) < 6:
+        raise HTTPException(
+            status_code=400, detail="Password must be at least 6 characters"
+        )
+
+    user.password_hash = hash_password(request.password)
+    db.commit()
+
+    return {"message": "Password set successfully"}
 
 
 @router.delete("/{user_id}")

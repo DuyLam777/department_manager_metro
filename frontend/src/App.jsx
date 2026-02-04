@@ -17,6 +17,14 @@ function App() {
   const [selectedFilter, setSelectedFilter] = useState(null);
   // Department dropdowns: closed by default. Set of department ids that are expanded.
   const [expandedDepartmentIds, setExpandedDepartmentIds] = useState(new Set());
+  // Department dropdowns in the "All Departments" overview
+  const [expandedOverviewDeptIds, setExpandedOverviewDeptIds] = useState(
+    new Set(),
+  );
+  // All users for the overview search
+  const [allUsers, setAllUsers] = useState([]);
+  // Search query for the "All Departments" overview
+  const [overviewSearchQuery, setOverviewSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [usersLoading, setUsersLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -99,7 +107,19 @@ function App() {
   useEffect(() => {
     fetchDepartments();
     fetchSettings();
+    fetchAllUsers();
   }, []);
+
+  const fetchAllUsers = async () => {
+    try {
+      const res = await fetch("/api/users");
+      if (!res.ok) throw new Error("Failed to fetch all users");
+      const data = await res.json();
+      setAllUsers(data);
+    } catch {
+      // ignore - overview search will not work but app still functions
+    }
+  };
 
   const fetchSettings = async () => {
     try {
@@ -167,6 +187,7 @@ function App() {
 
   const fetchData = async () => {
     await fetchDepartments();
+    await fetchAllUsers();
     if (selectedFilter !== null) {
       await fetchUsersForFilter(selectedFilter);
     }
@@ -194,19 +215,27 @@ function App() {
 
   const handleUserUpdate = (updatedUser) => {
     setUsers(users.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
+    setAllUsers(
+      allUsers.map((u) => (u.id === updatedUser.id ? updatedUser : u)),
+    );
   };
 
   const handleUserCreated = () => {
     fetchUsersForFilter(selectedFilter);
+    fetchAllUsers();
+    fetchDepartments();
   };
 
   const handleUserDelete = (userId) => {
     setUsers(users.filter((u) => u.id !== userId));
+    setAllUsers(allUsers.filter((u) => u.id !== userId));
     fetchDepartments(); // Refresh department/sub-department user counts in sidebar
   };
 
   const handleUserRestore = () => {
     fetchUsersForFilter(selectedFilter);
+    fetchAllUsers();
+    fetchDepartments();
   };
 
   // Get default department/sub for Add User when a filter is selected
@@ -220,12 +249,75 @@ function App() {
     return null;
   };
 
-  // Helper to get display name
+  // Helper to get display name (full name)
   const getDisplayName = (u) => {
     if (u.first_name || u.last_name) {
       return `${u.first_name || ""} ${u.last_name || ""}`.trim();
     }
     return u.username;
+  };
+
+  // Helper to get abbreviated name: first word of first_name + first word of last_name
+  const getAbbreviatedName = (u) => {
+    if (!u.first_name && !u.last_name) return u.username;
+    const firstWord = (u.first_name || "").split(" ")[0] || "";
+    const lastWord = (u.last_name || "").split(" ")[0] || "";
+    return `${firstWord} ${lastWord}`.trim() || u.username;
+  };
+
+  // Helper to get hover name: last_name + first_name (Vietnamese style)
+  const getHoverName = (u) => {
+    if (!u.first_name && !u.last_name) return u.username;
+    return `${u.last_name || ""} ${u.first_name || ""}`.trim() || u.username;
+  };
+
+  // Get users for a specific department (including sub-departments)
+  const getUsersForDepartment = (deptId) => {
+    const dept = departments.find((d) => d.id === deptId);
+    if (!dept) return [];
+    const subDeptIds = (dept.sub_departments || []).map((s) => s.id);
+    return allUsers.filter(
+      (u) =>
+        u.department_id === deptId ||
+        (u.sub_department_id && subDeptIds.includes(u.sub_department_id)),
+    );
+  };
+
+  // Get users for a specific sub-department
+  const getUsersForSubDepartment = (subDeptId) => {
+    return allUsers.filter((u) => u.sub_department_id === subDeptId);
+  };
+
+  // Filter departments and users by overview search query
+  const getOverviewSearchResults = () => {
+    if (!overviewSearchQuery.trim()) return null;
+
+    const results = [];
+    const assignedDepts = departments.filter((d) => !d.is_placeholder);
+
+    assignedDepts.forEach((dept) => {
+      const deptUsers = getUsersForDepartment(dept.id);
+      const matchingUsers = deptUsers.filter((u) => {
+        const searchFields = [
+          u.first_name,
+          u.last_name,
+          `${u.first_name || ""} ${u.last_name || ""}`,
+          u.username,
+        ];
+        return searchFields.some((field) =>
+          fuzzyMatch(overviewSearchQuery, field),
+        );
+      });
+
+      if (matchingUsers.length > 0) {
+        results.push({
+          department: dept,
+          users: matchingUsers,
+        });
+      }
+    });
+
+    return results;
   };
 
   if (authLoading) {
@@ -251,6 +343,7 @@ function App() {
       {selectedUserId && (
         <UserDetailModal
           userId={selectedUserId}
+          currentUserId={user?.id}
           departments={departments}
           isAdmin={user?.is_admin || false}
           token={getToken()}
@@ -333,7 +426,9 @@ function App() {
               >
                 Tất cả bộ phận
                 <span className="user-count">
-                  {departments.reduce((sum, d) => sum + (d.user_count ?? 0), 0)}
+                  {departments
+                    .filter((d) => !d.is_placeholder)
+                    .reduce((sum, d) => sum + (d.user_count ?? 0), 0)}
                 </span>
               </div>
             </li>
@@ -453,74 +548,364 @@ function App() {
             <>
               <div className="content-header">
                 <h1>Bộ phận &amp; Ban</h1>
-              </div>
-              <div className="departments-overview">
-                {filteredDepartments.map((dept) => (
-                  <div key={dept.id} className="department-overview-card">
-                    <div
-                      className="department-overview-header department-overview-clickable"
-                      onClick={() => {
-                        setSelectedFilter({
-                          type: "department",
-                          id: dept.id,
-                          name: dept.name,
-                          location: dept.location,
-                        });
-                        fetchUsersForFilter({
-                          type: "department",
-                          id: dept.id,
-                          name: dept.name,
-                        });
-                        if ((dept.sub_departments?.length ?? 0) > 0) {
-                          setExpandedDepartmentIds(
-                            (prev) => new Set([...prev, dept.id]),
-                          );
-                        }
-                      }}
-                    >
-                      <span className="department-overview-name">
-                        {dept.name}
-                      </span>
-                      <span className="department-overview-count">
-                        {dept.user_count ?? 0} người
-                      </span>
-                    </div>
-                    {dept.description && (
-                      <p className="department-overview-desc">
-                        {dept.description}
-                      </p>
-                    )}
-                    {(dept.sub_departments?.length ?? 0) > 0 && (
-                      <ul className="department-overview-subs">
-                        {dept.sub_departments.map((sub) => (
-                          <li
-                            key={sub.id}
-                            className="department-overview-sub-clickable"
-                            onClick={() => {
-                              const filter = {
-                                type: "sub",
-                                id: sub.id,
-                                name: sub.name,
-                                location: sub.location,
-                              };
-                              setSelectedFilter(filter);
-                              fetchUsersForFilter(filter);
-                              setExpandedDepartmentIds(
-                                (prev) => new Set([...prev, dept.id]),
-                              );
-                            }}
-                          >
-                            — {sub.name}
-                            <span className="department-overview-sub-count">
-                              {sub.user_count ?? 0} người
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
+                <div className="header-actions">
+                  <div className="search-box">
+                    <input
+                      type="text"
+                      placeholder="Tìm người dùng..."
+                      value={overviewSearchQuery}
+                      onChange={(e) => setOverviewSearchQuery(e.target.value)}
+                      className="search-input"
+                    />
+                    {overviewSearchQuery && (
+                      <button
+                        type="button"
+                        className="search-clear"
+                        onClick={() => setOverviewSearchQuery("")}
+                      >
+                        &times;
+                      </button>
                     )}
                   </div>
-                ))}
+                  {user?.is_admin && (
+                    <button
+                      className="btn-add-user"
+                      onClick={() => setShowAddUserModal(true)}
+                    >
+                      + Thêm người dùng
+                    </button>
+                  )}
+                </div>
               </div>
+
+              {/* Search results view */}
+              {overviewSearchQuery.trim() ? (
+                <div className="departments-overview">
+                  {(() => {
+                    const searchResults = getOverviewSearchResults();
+                    if (!searchResults || searchResults.length === 0) {
+                      return (
+                        <p className="no-users">Không tìm thấy người dùng</p>
+                      );
+                    }
+                    return searchResults.map(({ department, users }) => (
+                      <div
+                        key={department.id}
+                        className="department-overview-card"
+                      >
+                        <div className="department-overview-header">
+                          <span className="department-overview-name">
+                            {department.name}
+                          </span>
+                          <span className="department-overview-count">
+                            {users.length} kết quả
+                          </span>
+                        </div>
+                        <div className="user-grid overview-user-grid">
+                          {users.map((u) => {
+                            const abbreviatedName = getAbbreviatedName(u);
+                            const hoverName = getHoverName(u);
+                            return (
+                              <div
+                                key={u.id}
+                                className="user-card"
+                                onClick={() => setSelectedUserId(u.id)}
+                              >
+                                <div className="user-avatar">
+                                  <img
+                                    src={
+                                      u.profile_img ||
+                                      `https://ui-avatars.com/api/?name=${encodeURIComponent(abbreviatedName)}&background=6b7280&color=fff&size=128`
+                                    }
+                                    alt={abbreviatedName}
+                                  />
+                                  {u.is_admin && (
+                                    <span className="admin-badge">
+                                      Quản trị
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="user-name">
+                                  {abbreviatedName}
+                                </div>
+                                <div className="user-tooltip">
+                                  <div className="tooltip-row">
+                                    <span className="tooltip-label">
+                                      Họ và tên:
+                                    </span>
+                                    <span>{hoverName}</span>
+                                  </div>
+                                  <div className="tooltip-row">
+                                    <span className="tooltip-label">
+                                      Bộ phận:
+                                    </span>
+                                    <span>
+                                      {u.sub_department
+                                        ? `${u.sub_department} (${u.effective_bo_phan ?? u.bo_phan ?? "-"})`
+                                        : u.effective_bo_phan ||
+                                          u.bo_phan ||
+                                          "-"}
+                                    </span>
+                                  </div>
+                                  <div className="tooltip-row">
+                                    <span className="tooltip-label">
+                                      Chức vụ:
+                                    </span>
+                                    <span>
+                                      {u.position ||
+                                        (u.is_admin
+                                          ? "Quản trị viên"
+                                          : "Người dùng")}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              ) : (
+                /* Normal departments view with dropdowns */
+                <div className="departments-overview">
+                  {filteredDepartments
+                    .filter((d) => !d.is_placeholder)
+                    .map((dept) => {
+                      const isExpanded = expandedOverviewDeptIds.has(dept.id);
+                      const deptUsers = getUsersForDepartment(dept.id);
+                      const hasSubDepts =
+                        (dept.sub_departments?.length ?? 0) > 0;
+
+                      return (
+                        <div key={dept.id} className="department-overview-card">
+                          <div
+                            className="department-overview-header department-overview-clickable"
+                            onClick={() => {
+                              setExpandedOverviewDeptIds((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(dept.id)) {
+                                  next.delete(dept.id);
+                                } else {
+                                  next.add(dept.id);
+                                }
+                                return next;
+                              });
+                            }}
+                          >
+                            <span className="department-overview-name">
+                              <span className="overview-chevron">
+                                {isExpanded ? "▼" : "▶"}
+                              </span>
+                              {dept.name}
+                            </span>
+                            <span className="department-overview-count">
+                              {dept.user_count ?? 0} người
+                            </span>
+                          </div>
+                          {dept.description && (
+                            <p className="department-overview-desc">
+                              {dept.description}
+                            </p>
+                          )}
+
+                          {/* Dropdown content - users */}
+                          {isExpanded && (
+                            <div className="overview-dropdown-content">
+                              {/* Sub-departments with their users */}
+                              {hasSubDepts && (
+                                <div className="overview-sub-sections">
+                                  {dept.sub_departments.map((sub) => {
+                                    const subUsers = getUsersForSubDepartment(
+                                      sub.id,
+                                    );
+                                    return (
+                                      <div
+                                        key={sub.id}
+                                        className="overview-sub-section"
+                                      >
+                                        <div className="overview-sub-header">
+                                          <span>— {sub.name}</span>
+                                          <span className="department-overview-sub-count">
+                                            {sub.user_count ?? 0} người
+                                          </span>
+                                        </div>
+                                        {subUsers.length > 0 ? (
+                                          <div className="user-grid overview-user-grid">
+                                            {subUsers.map((u) => {
+                                              const abbreviatedName =
+                                                getAbbreviatedName(u);
+                                              const hoverName = getHoverName(u);
+                                              return (
+                                                <div
+                                                  key={u.id}
+                                                  className="user-card"
+                                                  onClick={() =>
+                                                    setSelectedUserId(u.id)
+                                                  }
+                                                >
+                                                  <div className="user-avatar">
+                                                    <img
+                                                      src={
+                                                        u.profile_img ||
+                                                        `https://ui-avatars.com/api/?name=${encodeURIComponent(abbreviatedName)}&background=6b7280&color=fff&size=128`
+                                                      }
+                                                      alt={abbreviatedName}
+                                                    />
+                                                    {u.is_admin && (
+                                                      <span className="admin-badge">
+                                                        Quản trị
+                                                      </span>
+                                                    )}
+                                                  </div>
+                                                  <div className="user-name">
+                                                    {abbreviatedName}
+                                                  </div>
+                                                  <div className="user-tooltip">
+                                                    <div className="tooltip-row">
+                                                      <span className="tooltip-label">
+                                                        Họ và tên:
+                                                      </span>
+                                                      <span>{hoverName}</span>
+                                                    </div>
+                                                    <div className="tooltip-row">
+                                                      <span className="tooltip-label">
+                                                        Bộ phận:
+                                                      </span>
+                                                      <span>
+                                                        {u.sub_department
+                                                          ? `${u.sub_department} (${u.effective_bo_phan ?? u.bo_phan ?? "-"})`
+                                                          : u.effective_bo_phan ||
+                                                            u.bo_phan ||
+                                                            "-"}
+                                                      </span>
+                                                    </div>
+                                                    <div className="tooltip-row">
+                                                      <span className="tooltip-label">
+                                                        Chức vụ:
+                                                      </span>
+                                                      <span>
+                                                        {u.position ||
+                                                          (u.is_admin
+                                                            ? "Quản trị viên"
+                                                            : "Người dùng")}
+                                                      </span>
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        ) : (
+                                          <p className="overview-no-users">
+                                            Chưa có người dùng
+                                          </p>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+
+                              {/* Direct department users (not in sub-departments) */}
+                              {(() => {
+                                const directUsers = deptUsers.filter(
+                                  (u) => !u.sub_department_id,
+                                );
+                                if (directUsers.length === 0 && !hasSubDepts) {
+                                  return (
+                                    <p className="overview-no-users">
+                                      Chưa có người dùng
+                                    </p>
+                                  );
+                                }
+                                if (directUsers.length === 0) return null;
+                                return (
+                                  <div className="overview-direct-users">
+                                    {hasSubDepts && (
+                                      <div className="overview-sub-header">
+                                        <span>— Trực thuộc bộ phận</span>
+                                        <span className="department-overview-sub-count">
+                                          {directUsers.length} người
+                                        </span>
+                                      </div>
+                                    )}
+                                    <div className="user-grid overview-user-grid">
+                                      {directUsers.map((u) => {
+                                        const abbreviatedName =
+                                          getAbbreviatedName(u);
+                                        const hoverName = getHoverName(u);
+                                        return (
+                                          <div
+                                            key={u.id}
+                                            className="user-card"
+                                            onClick={() =>
+                                              setSelectedUserId(u.id)
+                                            }
+                                          >
+                                            <div className="user-avatar">
+                                              <img
+                                                src={
+                                                  u.profile_img ||
+                                                  `https://ui-avatars.com/api/?name=${encodeURIComponent(abbreviatedName)}&background=6b7280&color=fff&size=128`
+                                                }
+                                                alt={abbreviatedName}
+                                              />
+                                              {u.is_admin && (
+                                                <span className="admin-badge">
+                                                  Quản trị
+                                                </span>
+                                              )}
+                                            </div>
+                                            <div className="user-name">
+                                              {abbreviatedName}
+                                            </div>
+                                            <div className="user-tooltip">
+                                              <div className="tooltip-row">
+                                                <span className="tooltip-label">
+                                                  Họ và tên:
+                                                </span>
+                                                <span>{hoverName}</span>
+                                              </div>
+                                              <div className="tooltip-row">
+                                                <span className="tooltip-label">
+                                                  Bộ phận:
+                                                </span>
+                                                <span>
+                                                  {u.sub_department
+                                                    ? `${u.sub_department} (${u.effective_bo_phan ?? u.bo_phan ?? "-"})`
+                                                    : u.effective_bo_phan ||
+                                                      u.bo_phan ||
+                                                      "-"}
+                                                </span>
+                                              </div>
+                                              <div className="tooltip-row">
+                                                <span className="tooltip-label">
+                                                  Chức vụ:
+                                                </span>
+                                                <span>
+                                                  {u.position ||
+                                                    (u.is_admin
+                                                      ? "Quản trị viên"
+                                                      : "Người dùng")}
+                                                </span>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
             </>
           ) : (
             <>
@@ -569,7 +954,8 @@ function App() {
               ) : (
                 <div className="user-grid">
                   {filteredUsers.map((u) => {
-                    const displayName = getDisplayName(u);
+                    const abbreviatedName = getAbbreviatedName(u);
+                    const hoverName = getHoverName(u);
                     return (
                       <div
                         key={u.id}
@@ -580,20 +966,20 @@ function App() {
                           <img
                             src={
                               u.profile_img ||
-                              `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=6b7280&color=fff&size=128`
+                              `https://ui-avatars.com/api/?name=${encodeURIComponent(abbreviatedName)}&background=6b7280&color=fff&size=128`
                             }
-                            alt={displayName}
+                            alt={abbreviatedName}
                           />
                           {u.is_admin && (
                             <span className="admin-badge">Quản trị</span>
                           )}
                         </div>
-                        <div className="user-name">{displayName}</div>
+                        <div className="user-name">{abbreviatedName}</div>
 
                         <div className="user-tooltip" style={{ zIndex: 9999 }}>
                           <div className="tooltip-row">
                             <span className="tooltip-label">Họ và tên:</span>
-                            <span>{displayName}</span>
+                            <span>{hoverName}</span>
                           </div>
 
                           {user?.is_admin && (

@@ -28,6 +28,7 @@ export function AddUserModal({
   const [profileImg, setProfileImg] = useState("");
   const [departmentOrSub, setDepartmentOrSub] = useState(initialPlace);
   const [cropImageSrc, setCropImageSrc] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // Check if form has any data entered
   const hasUnsavedChanges = () => {
@@ -38,7 +39,8 @@ export function AddUserModal({
       lastName.trim() !== "" ||
       position.trim() !== "" ||
       profileImg !== "" ||
-      departmentOrSub !== initialPlace
+      departmentOrSub !== initialPlace ||
+      isAdmin
     );
   };
 
@@ -72,7 +74,7 @@ export function AddUserModal({
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          username,
+          username: isAdmin ? username : null,
           email: email || null,
           first_name: firstName || null,
           last_name: lastName || null,
@@ -80,6 +82,7 @@ export function AddUserModal({
           profile_img: profileImg || null,
           department_id: departmentId,
           sub_department_id: subDepartmentId,
+          is_admin: isAdmin,
         }),
       });
 
@@ -89,7 +92,11 @@ export function AddUserModal({
       }
 
       const newUser = await response.json();
-      setGeneratedPassword(newUser.generated_password);
+      if (newUser.generated_password) {
+        setGeneratedPassword(newUser.generated_password);
+      } else {
+        setCreatedUser(newUser);
+      }
       onUserCreated(newUser);
     } catch (err) {
       setError(err.message);
@@ -102,8 +109,16 @@ export function AddUserModal({
     navigator.clipboard.writeText(generatedPassword);
   };
 
-  // Show success screen with generated password
-  if (generatedPassword) {
+  // Track if user was created successfully (for non-admin users without password)
+  const [createdUser, setCreatedUser] = useState(null);
+
+  // Show success screen
+  if (generatedPassword || createdUser) {
+    const displayName =
+      firstName || lastName
+        ? `${firstName} ${lastName}`.trim()
+        : username || "Người dùng mới";
+
     return (
       <div className="modal-overlay" onClick={onClose}>
         <div
@@ -125,25 +140,34 @@ export function AddUserModal({
           <div className="success-content">
             <div className="success-icon">✓</div>
             <p className="success-message">
-              Người dùng <strong>{username}</strong> đã được tạo.
+              {isAdmin ? "Quản trị viên" : "Người dùng"}{" "}
+              <strong>{displayName}</strong> đã được tạo.
             </p>
 
-            <div className="password-section">
-              <label>Mật khẩu tạo tự động (chỉ hiển thị một lần):</label>
-              <div className="password-display">
-                <code>{generatedPassword}</code>
-                <button
-                  type="button"
-                  className="btn-copy"
-                  onClick={copyPassword}
-                >
-                  Sao chép
-                </button>
+            {generatedPassword && (
+              <div className="password-section">
+                <label>Mật khẩu tạo tự động (chỉ hiển thị một lần):</label>
+                <div className="password-display">
+                  <code>{generatedPassword}</code>
+                  <button
+                    type="button"
+                    className="btn-copy"
+                    onClick={copyPassword}
+                  >
+                    Sao chép
+                  </button>
+                </div>
+                <p className="password-warning">
+                  Vui lòng lưu mật khẩu này. Sẽ không được hiển thị lại.
+                </p>
               </div>
-              <p className="password-warning">
-                Vui lòng lưu mật khẩu này. Sẽ không được hiển thị lại.
+            )}
+
+            {!generatedPassword && (
+              <p className="info-message">
+                Người dùng thường không có tài khoản đăng nhập.
               </p>
-            </div>
+            )}
           </div>
 
           <div className="form-actions">
@@ -233,17 +257,6 @@ export function AddUserModal({
           </div>
 
           <div className="form-group">
-            <label htmlFor="username">Tên đăng nhập *</label>
-            <input
-              id="username"
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-            />
-          </div>
-
-          <div className="form-group">
             <label htmlFor="email">Email</label>
             <input
               id="email"
@@ -284,9 +297,35 @@ export function AddUserModal({
             </select>
           </div>
 
-          <p className="form-note">
-            Mật khẩu sẽ được tạo ngẫu nhiên cho người dùng này.
-          </p>
+          <div className="form-group checkbox-group">
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={isAdmin}
+                onChange={(e) => setIsAdmin(e.target.checked)}
+              />
+              <span>Cấp quyền quản trị viên</span>
+            </label>
+            <p className="checkbox-hint">
+              Quản trị viên có thể đăng nhập và quản lý hệ thống.
+            </p>
+          </div>
+
+          {isAdmin && (
+            <div className="form-group">
+              <label htmlFor="username">Tên đăng nhập *</label>
+              <input
+                id="username"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+              />
+              <p className="form-note">
+                Mật khẩu sẽ được tạo ngẫu nhiên cho quản trị viên này.
+              </p>
+            </div>
+          )}
 
           <div className="form-actions">
             <button type="button" className="btn-cancel" onClick={handleClose}>
@@ -295,7 +334,7 @@ export function AddUserModal({
             <button
               type="submit"
               className="btn-save"
-              disabled={saving || !username.trim()}
+              disabled={saving || (isAdmin && !username.trim())}
             >
               {saving ? "Đang tạo..." : "Tạo người dùng"}
             </button>

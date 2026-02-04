@@ -366,6 +366,25 @@
 .manage-sub-actions .btn-delete {
     padding: 0.25rem 0.5rem;
     font-size: 0.8rem;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    border: 1px solid #d1d5db;
+    background-color: white;
+    color: #374151;
+}
+
+.manage-sub-actions .btn-edit:hover,
+.manage-sub-actions .btn-delete:hover {
+    background-color: #f3f4f6;
+}
+
+.manage-sub-actions .btn-delete {
+    color: #dc2626;
+    border-color: #fecaca;
+}
+
+.manage-sub-actions .btn-delete:hover {
+    background-color: #fef2f2;
 }
 
 .manage-dept-actions .btn-edit,
