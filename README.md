@@ -1,78 +1,151 @@
 # Metro Department Manager
 
-A comprehensive human resources and organizational management system for managing employees, departments, and their hierarchical relationships.
+A comprehensive human resources and organizational management system for managing employees, departments, and hierarchical relationships.
+
+## Table of Contents
+
+- [Features](#features)
+- [Running with Docker](#running-with-docker)
+- [Sharing port with Ngrok](#sharing-port-with-ngrok)
+- [Run local development](#run-local-development)
+- [Default admin credentials](#default-admin-credentials)
+- [Project structure](#project-structure)
+- [Backend endpoints](#backend-endpoints)
+- [License](#license)
+
+---
 
 ## Features
 
-- **Department Management**: Hierarchical department structures with sub-departments
-- **Employee Management**: Track and organize employees across organizational units
-- **User Authentication**: Role-based access control (admin vs. regular users)
-- **Profile Management**: Employee profiles with photo upload and cropping
-- **Soft Deletion**: Archive and restore records
-- **Search & Filtering**: Find users by name, email, position, or department
+- Department management with hierarchical (parent / child) departments
+- Employee management and profiles (including photo upload + cropping)
+- Role-based authentication (admin vs regular users) using JWT
+- Soft-deletion (archive / restore) for records
+- Search and filters (by name, email, position, department)
+- RESTful API built with FastAPI and a React + Vite frontend
 
-## Technology Stack
+---
 
-### Backend
-- **Framework**: FastAPI (Python 3.14+)
-- **Database**: SQLite with SQLAlchemy ORM
-- **Authentication**: JWT tokens with bcrypt password hashing
-- **Server**: Uvicorn
+## Running with Docker
 
-### Frontend
-- **Framework**: React 19
-- **Build Tool**: Vite
-- **Styling**: CSS modules
-- **Image Processing**: react-easy-crop
+Recommended: use Docker Compose to build and run the whole stack.
 
-### Deployment
-- Docker & Docker Compose
-- Nginx reverse proxy
-
-## Getting Started
-
-### Prerequisites
-
-- Docker & Docker Compose (recommended)
-- OR: Python 3.14+, Node.js 22+
-
-### Option 1: Docker Compose (Recommended)
-
+Start (build and run):
 ```bash
-# Build and start all services
-docker-compose up --build
+# Modern Docker CLI
+docker compose up --build
 
-# Access the application
-# Frontend: http://localhost:3000
-# Backend API: http://localhost:8000
+# Legacy docker-compose (if present)
+docker-compose up --build
 ```
 
-### Option 2: Local Development
+Stop and remove containers, networks, and volumes created by Compose (reset to a fresh state):
+```bash
+# Modern Docker CLI — removes anonymous and named volumes created by Compose
+docker compose down --volumes
 
-**Backend:**
+# Legacy docker-compose:
+docker-compose down -v
+```
+
+Optional: remove images built by compose as well:
+```bash
+docker compose down --rmi all --volumes --remove-orphans
+```
+
+Remove a single container and its anonymous volumes:
+```bash
+# stop container
+docker stop <container_name_or_id>
+
+# remove container and anonymous volumes
+docker rm -v <container_name_or_id>
+
+# force stop + remove in one step
+docker rm -f -v <container_name_or_id>
+```
+
+Inspect and remove volumes (be careful — data is permanent):
+```bash
+docker volume ls
+docker volume rm <volume_name>
+# to delete unused volumes interactively:
+docker volume prune
+```
+
+Notes and tips:
+- Prefer `docker compose down --volumes` for this project because it targets only the resources created by the compose file.
+- If your DB is persisted in a named volume defined in `docker-compose.yml`, removing that volume will reset the database to an empty state.
+- After cleaning, rebuild and start fresh:
+```bash
+docker compose up --build
+```
+
+---
+
+## Sharing port with Ngrok
+
+If you need to share your local frontend (or backend) with external users or test webhooks, use ngrok to forward a local port to a public URL.
+
+1. Install ngrok from https://ngrok.com
+2. (Optional) Authenticate your ngrok client with your authtoken:
+```bash
+ngrok config add-authtoken <YOUR_NGROK_AUTHTOKEN>
+```
+3. Start a tunnel that forwards traffic to your local frontend port (3000):
+```bash
+ngrok http 3000
+```
+
+Ngrok will print one or more forwarding URLs (e.g. `https://abcd-1234.ngrok.io`). Share the `https` URL to let remote users access your locally running frontend.
+
+Notes:
+- To expose the backend instead, run `ngrok http 8000`.
+- Make sure your CORS configuration and any host-based checks accept requests from the forwarded host if necessary.
+- Free ngrok sessions have limitations; if you need persistent subdomains or long sessions, consider a paid plan.
+
+---
+
+## Run local development
+
+Backend (FastAPI + Uvicorn):
 ```bash
 cd backend
-uv sync
+
+# Install dependencies as appropriate (example):
+# pip install -r requirements.txt
+# or use your environment manager: poetry install
+
+# Run development server
 uv run uvicorn app.main:app --reload
-# Server runs at http://localhost:8000
+
+# Default: http://localhost:8000
 ```
 
-**Frontend:**
+Frontend (React + Vite):
 ```bash
 cd frontend
 npm install
 npm run dev
-# Server runs at http://localhost:5173
+
+# Vite dev server default: http://localhost:5173
+# If frontend is served via this project's Docker/nginx config, it may be available at http://localhost:3000
 ```
 
-## Default Admin Credentials
+---
 
-| Username | Password |
-|----------|----------|
-| admin | Admin@1234 |
-| truongphong | TruongPhong@123 |
+## Default admin credentials
 
-## Project Structure
+Use these seeded accounts for development/testing only. Change or disable in production.
+
+| Username      | Password         |
+|---------------|------------------|
+| `admin`       | `Admin@1234`     |
+| `truongphong` | `TruongPhong@123`|
+
+---
+
+## Project structure
 
 ```
 department_manager_metro/
@@ -100,19 +173,28 @@ department_manager_metro/
 └── docker-compose.yml
 ```
 
-## API Endpoints
+---
 
-| Endpoint | Description |
-|----------|-------------|
-| `POST /auth/login` | Admin login |
-| `GET /users` | List all users |
-| `POST /users` | Create user |
-| `GET /departments` | List departments |
-| `POST /departments` | Create department |
-| `GET /sub_departments` | List sub-departments |
-| `POST /upload` | Upload profile image |
-| `GET /settings` | Get app settings |
+## Backend endpoints
+
+Common endpoints (subject to change — check `backend/app/routes` for the most up-to-date routes):
+
+- `POST /auth/login` — Authenticate and receive JWT token
+- `GET /users` — List users
+- `POST /users` — Create user
+- `GET /departments` — List departments
+- `POST /departments` — Create department
+- `GET /sub_departments` — List sub-departments
+- `POST /upload` — Upload profile image
+- `GET /settings` — Get app settings
+
+Example: call a protected endpoint using curl (replace `<TOKEN>`):
+```bash
+curl -H "Authorization: Bearer <TOKEN>" http://localhost:8000/users
+```
+
+---
 
 ## License
 
-This project is proprietary software.
+This project is proprietary software. Contact the project owner for licensing and distribution details.
