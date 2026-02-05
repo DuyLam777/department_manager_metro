@@ -265,8 +265,90 @@
         padding: 1rem 1.25rem;
     }
 
+    .settings-modal-header {
+        margin-bottom: 1rem;
+        padding-bottom: 0.75rem;
+    }
+
+    .settings-modal-header h2 {
+        font-size: 1.2rem;
+    }
+
+    .settings-close-btn {
+        min-width: 44px;
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .settings-input {
+        min-height: 44px;
+        font-size: 1rem;
+    }
+
+    .settings-color-row {
+        flex-wrap: wrap;
+    }
+
+    .settings-color-input {
+        width: 48px;
+        height: 48px;
+    }
+
+    .settings-color-hex {
+        min-height: 44px;
+    }
+
+    .btn-reset-color {
+        min-height: 44px;
+    }
+
+    .settings-banner-actions {
+        flex-wrap: wrap;
+    }
+
+    .settings-modal .btn-upload-img,
+    .settings-modal .btn-remove-img {
+        min-height: 44px;
+        padding: 0.5rem 0.875rem;
+    }
+
+    .btn-deleted-items-settings {
+        min-height: 44px;
+    }
+
     .settings-actions .btn-cancel,
     .settings-actions .btn-save {
         min-height: 44px;
+    }
+}
+
+@media (max-width: 480px) {
+    .settings-modal {
+        max-height: 90vh;
+        padding: 0.875rem 1rem;
+    }
+
+    .settings-modal-header h2 {
+        font-size: 1.1rem;
+    }
+
+    .settings-color-row {
+        gap: 0.5rem;
+    }
+
+    .settings-color-hex {
+        flex: 1 1 100%;
+        order: 1;
+    }
+
+    .settings-color-input {
+        order: 0;
+    }
+
+    .btn-reset-color {
+        order: 2;
+        flex: 1;
     }
 }

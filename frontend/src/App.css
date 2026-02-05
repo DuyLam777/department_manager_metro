@@ -10,17 +10,31 @@ body {
         -apple-system,
         sans-serif;
     background-color: #f3f4f6;
+    overflow: hidden;
 }
 
 .app-container {
-    min-height: 100vh;
+    height: 100vh;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 }
 
 .layout {
     display: flex;
     flex: 1;
+    min-height: 0;
+    position: relative;
+}
+
+/* Burger menu - hidden on desktop */
+.burger-menu {
+    display: none;
+}
+
+/* Sidebar overlay - for mobile */
+.sidebar-overlay {
+    display: none;
 }
 
 /* Sidebar */
@@ -32,13 +46,37 @@ body {
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
+    height: 100%;
+    overflow: hidden;
 }
 
-.sidebar h2 {
-    font-size: 1.25rem;
+.sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     margin-bottom: 0.75rem;
     padding-bottom: 0.5rem;
     border-bottom: 1px solid #374151;
+}
+
+.sidebar-header h2 {
+    font-size: 1.25rem;
+    margin: 0;
+}
+
+.sidebar-close-btn {
+    display: none;
+    background: none;
+    border: none;
+    color: #9ca3af;
+    font-size: 1.75rem;
+    cursor: pointer;
+    padding: 0.25rem;
+    line-height: 1;
+}
+
+.sidebar-close-btn:hover {
+    color: white;
 }
 
 .sidebar-dept-search {
@@ -208,6 +246,8 @@ body {
     flex: 1;
     padding: 2rem;
     min-width: 0;
+    height: 100%;
+    overflow-y: auto;
 }
 
 .content-header {
@@ -652,26 +692,137 @@ tbody tr:last-child td {
     color: #9ca3af;
 }
 
+/* Multiple positions tooltip display */
+.tooltip-positions {
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.tooltip-positions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-top: 0.25rem;
+    padding-left: 0.5rem;
+    border-left: 2px solid #374151;
+}
+
+.tooltip-position-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+}
+
+.tooltip-subdept {
+    font-weight: 500;
+    color: #d1d5db;
+    font-size: 0.75rem;
+}
+
 /* Mobile Responsive */
 @media (max-width: 768px) {
+    body {
+        overflow: auto;
+    }
+
+    .app-container {
+        height: auto;
+        min-height: 100vh;
+        overflow: visible;
+    }
+
     .layout {
         flex-direction: column;
         min-height: 0;
     }
 
-    .sidebar {
-        width: 100%;
-        padding: 1rem;
-        max-height: 45vh;
-        overflow-y: auto;
-        flex-shrink: 0;
-        margin: 0;
+    /* Burger menu button */
+    .burger-menu {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 5px;
+        position: fixed;
+        top: 0.5rem;
+        left: 0.5rem;
+        z-index: 1001;
+        width: 44px;
+        height: 44px;
+        background-color: transparent;
+        border: none;
+        border-radius: 0.5rem;
+        cursor: pointer;
     }
 
-    .sidebar h2 {
-        font-size: 1rem;
-        margin-bottom: 0.75rem;
-        padding-bottom: 0.5rem;
+    .burger-menu:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .burger-line {
+        width: 22px;
+        height: 2px;
+        background-color: white;
+        border-radius: 1px;
+        transition:
+            transform 0.2s,
+            opacity 0.2s;
+    }
+
+    /* Sidebar overlay */
+    .sidebar-overlay {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1002;
+        opacity: 0;
+        visibility: hidden;
+        transition:
+            opacity 0.3s,
+            visibility 0.3s;
+    }
+
+    .sidebar-overlay.active {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    /* Sidebar - slide out from left */
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 280px;
+        max-width: 85vw;
+        height: 100vh;
+        height: 100dvh;
+        padding: 1rem;
+        z-index: 1003;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease-in-out;
+        overflow-y: auto;
+    }
+
+    .sidebar.open {
+        transform: translateX(0);
+    }
+
+    .sidebar-header {
+        margin-bottom: 1rem;
+        padding-bottom: 0.75rem;
+    }
+
+    .sidebar-header h2 {
+        font-size: 1.1rem;
+    }
+
+    .sidebar-close-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 44px;
+        min-height: 44px;
     }
 
     .sidebar-dept-search {
@@ -686,6 +837,8 @@ tbody tr:last-child td {
 
     .department-list {
         margin-bottom: 0.75rem;
+        flex: 1;
+        overflow-y: auto;
     }
 
     .department-item,
@@ -700,11 +853,15 @@ tbody tr:last-child td {
         padding: 0.75rem 0.75rem;
         font-size: 0.9rem;
         margin-top: 1rem;
+        flex-shrink: 0;
     }
 
+    /* Main content */
     .main-content {
         padding: 1rem;
         min-height: 0;
+        height: auto;
+        overflow: visible;
     }
 
     .content-header {
@@ -788,6 +945,14 @@ tbody tr:last-child td {
         display: none;
     }
 
+    /* Prevent user cards from stacking above modals on touch devices */
+    /* On mobile, taps can trigger :hover or leave elements in a high stacking context.
+       Ensure user cards don't retain the large hover z-index and cover modals. */
+    .user-card,
+    .user-card:hover {
+        z-index: auto;
+    }
+
     /* Overview user grid mobile */
     .overview-user-grid {
         grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
@@ -815,8 +980,14 @@ tbody tr:last-child td {
 }
 
 @media (max-width: 480px) {
+    .burger-menu {
+        top: 0.75rem;
+        left: 0.75rem;
+    }
+
     .sidebar {
-        max-height: 40vh;
+        width: 100%;
+        max-width: 100%;
         padding: 0.75rem 1rem;
     }
 

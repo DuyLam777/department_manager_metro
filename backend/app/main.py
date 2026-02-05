@@ -12,6 +12,9 @@ from app.domain.sub_department import (
     SubDepartment,  # noqa: F401 - needed for table creation
 )
 from app.domain.user import User  # noqa: F401 - needed for table creation
+from app.domain.user_sub_department import (
+    UserSubDepartment,  # noqa: F401 - needed for table creation
+)
 from app.routes import auth, departments, settings, sub_departments, uploads, users
 from app.seed import seed_data
 

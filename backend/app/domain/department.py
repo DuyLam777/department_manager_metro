@@ -20,7 +20,19 @@ class Department(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    # Relationship: one department has many users (direct)
-    users = relationship("User", back_populates="department")
     # Relationship: one department has many sub_departments
     sub_departments = relationship("SubDepartment", back_populates="department")
+
+    @property
+    def users(self):
+        """Get all unique users in this department (through sub-departments)."""
+        user_ids_seen = set()
+        users = []
+        for sub in self.sub_departments:
+            if not sub.deleted:
+                for assignment in sub.user_assignments:
+                    if assignment.user and not assignment.user.deleted:
+                        if assignment.user.id not in user_ids_seen:
+                            user_ids_seen.add(assignment.user.id)
+                            users.append(assignment.user)
+        return users

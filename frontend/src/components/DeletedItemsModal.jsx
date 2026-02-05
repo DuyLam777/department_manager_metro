@@ -34,7 +34,7 @@ export function DeletedItemsModal({
         throw new Error("Tải danh sách người dùng đã xóa thất bại");
       if (!deptsRes.ok)
         throw new Error("Tải danh sách bộ phận đã xóa thất bại");
-      if (!subsRes.ok) throw new Error("Tải danh sách ban đã xóa thất bại");
+      if (!subsRes.ok) throw new Error("Tải danh sách Phòng đã xóa thất bại");
       const [usersData, deptsData, subsData] = await Promise.all([
         usersRes.json(),
         deptsRes.json(),
@@ -98,7 +98,7 @@ export function DeletedItemsModal({
   };
 
   const handleRestoreSubDepartment = async (subId, name) => {
-    if (!confirm(`Khôi phục ban "${name}"?`)) return;
+    if (!confirm(`Khôi phục Phòng "${name}"?`)) return;
     setActionLoading(`sub-${subId}`);
     try {
       const response = await fetch(`/api/sub-departments/${subId}/restore`, {
@@ -107,7 +107,7 @@ export function DeletedItemsModal({
       });
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.detail || "Khôi phục ban thất bại");
+        throw new Error(data.detail || "Khôi phục Phòng thất bại");
       }
       setSubDepartments(subDepartments.filter((s) => s.id !== subId));
       onRestoreSubDepartment?.();
@@ -171,7 +171,7 @@ export function DeletedItemsModal({
   const handlePermanentDeleteSubDepartment = async (subId, name) => {
     if (
       !confirm(
-        `Bạn có chắc muốn XÓA VĨNH VIỄN ban "${name}"? Hành động này không thể phục hồi!`,
+        `Bạn có chắc muốn XÓA VĨNH VIỄN Phòng "${name}"? Hành động này không thể phục hồi!`,
       )
     )
       return;
@@ -183,7 +183,7 @@ export function DeletedItemsModal({
       });
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.detail || "Xóa ban thất bại");
+        throw new Error(data.detail || "Xóa Phòng thất bại");
       }
       setSubDepartments(subDepartments.filter((s) => s.id !== subId));
     } catch (err) {
@@ -407,14 +407,14 @@ export function DeletedItemsModal({
             {/* Deleted Sub-departments section */}
             <section className="deleted-section">
               <div className="deleted-section-header">
-                <h3>Ban đã xóa</h3>
+                <h3>Phòng đã xóa</h3>
                 <span className="deleted-section-count">
-                  {subDepartments.length} ban
+                  {subDepartments.length} Phòng
                   {subDepartments.length !== 1 ? "" : ""}
                 </span>
               </div>
               {subDepartments.length === 0 ? (
-                <p className="empty-text">Không có ban đã xóa</p>
+                <p className="empty-text">Không có Phòng đã xóa</p>
               ) : (
                 <ul className="deleted-dept-list">
                   {subDepartments.map((s) => (

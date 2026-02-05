@@ -5,8 +5,8 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.config.database import get_db
-from app.domain.department import Department
 from app.domain.sub_department import SubDepartment
+from app.domain.user_sub_department import UserSubDepartment
 from app.repo import department_repo, sub_department_repo
 from app.routes.auth import require_admin
 
@@ -29,9 +29,13 @@ class SubDepartmentUpdateRequest(BaseModel):
     department_id: int | None = None
 
 
-def _active_users(users) -> list:
-    """Users that are not soft-deleted."""
-    return [u for u in users if not u.deleted]
+def _active_users_count(sub: SubDepartment) -> int:
+    """Count active (non-deleted) users in a sub-department."""
+    count = 0
+    for assignment in sub.user_assignments:
+        if assignment.user and not assignment.user.deleted:
+            count += 1
+    return count
 
 
 def _sub_to_dict(sub: SubDepartment) -> dict:
@@ -44,7 +48,7 @@ def _sub_to_dict(sub: SubDepartment) -> dict:
         "department_id": sub.department_id,
         "department_name": sub.department.name if sub.department else None,
         "is_placeholder": sub.is_placeholder,
-        "user_count": len(_active_users(sub.users)),
+        "user_count": _active_users_count(sub),
     }
 
 
@@ -131,27 +135,26 @@ def permanent_delete_sub_department(
         .first()
     )
     if not sub:
-        raise HTTPException(status_code=404, detail="Ban đã xóa không tìm thấy")
+        raise HTTPException(status_code=404, detail="Phòng đã xóa không tìm thấy")
     if sub.is_placeholder:
         raise HTTPException(
-            status_code=400, detail="Không thể xóa vĩnh viễn ban placeholder"
+            status_code=400, detail="Không thể xóa vĩnh viễn Phòng placeholder"
         )
+
+    # Delete any remaining user assignments to this sub-department
+    db.query(UserSubDepartment).filter(
+        UserSubDepartment.sub_department_id == sub_department_id
+    ).delete()
+
     db.delete(sub)
     db.commit()
-    return {"message": "Ban đã được xóa vĩnh viễn"}
+    return {"message": "Phòng đã được xóa vĩnh viễn"}
 
 
 @router.get("/{sub_department_id}")
 def get_sub_department(sub_department_id: int, db: Session = Depends(get_db)):
     """Get a single sub_department by ID. Read-only for all."""
-    sub = (
-        db.query(SubDepartment)
-        .filter(
-            SubDepartment.id == sub_department_id,
-            SubDepartment.deleted == False,
-        )
-        .first()
-    )
+    sub = sub_department_repo.get_sub_department_by_id(db, sub_department_id)
     if not sub:
         raise HTTPException(status_code=404, detail="Sub-department not found")
     return _sub_to_dict(sub)
@@ -190,14 +193,7 @@ def update_sub_department(
     _admin=Depends(require_admin),
 ):
     """Update a sub_department. Admin only. Cannot update placeholder."""
-    sub = (
-        db.query(SubDepartment)
-        .filter(
-            SubDepartment.id == sub_department_id,
-            SubDepartment.deleted == False,
-        )
-        .first()
-    )
+    sub = sub_department_repo.get_sub_department_by_id(db, sub_department_id)
     if not sub:
         raise HTTPException(status_code=404, detail="Sub-department not found")
     if sub.is_placeholder:
@@ -228,15 +224,8 @@ def delete_sub_department(
     db: Session = Depends(get_db),
     _admin=Depends(require_admin),
 ):
-    """Xóa mềm một ban (sub-department). Gán lại người dùng sang bộ phận 'Chưa phân công' (không có ban con). Chỉ quản trị viên."""
-    sub = (
-        db.query(SubDepartment)
-        .filter(
-            SubDepartment.id == sub_department_id,
-            SubDepartment.deleted == False,
-        )
-        .first()
-    )
+    """Xóa mềm một Phòng (sub-department). Gán lại người dùng sang Phòng 'Chưa phân công'. Chỉ quản trị viên."""
+    sub = sub_department_repo.get_sub_department_by_id(db, sub_department_id)
     if not sub:
         raise HTTPException(status_code=404, detail="Sub-department not found")
     if sub.is_placeholder:
@@ -244,18 +233,20 @@ def delete_sub_department(
             status_code=400, detail="Cannot delete placeholder sub-department"
         )
 
-    placeholder_dept = department_repo.get_placeholder_department(db)
-    if not placeholder_dept:
-        raise HTTPException(status_code=500, detail="Placeholder department not found")
+    placeholder_sub = department_repo.get_placeholder_sub_department(db)
+    if not placeholder_sub:
+        raise HTTPException(
+            status_code=500, detail="Placeholder sub-department not found"
+        )
 
-    # Reassign users to Unassigned department (direct, no sub_department)
-    for u in sub.users:
-        u.department_id = placeholder_dept.id
-        u.sub_department_id = None
+    # Reassign user assignments to placeholder sub-department
+    for assignment in sub.user_assignments:
+        assignment.sub_department_id = placeholder_sub.id
+        assignment.position = None  # Clear position when moving to unassigned
 
     sub.deleted = True
     sub.deleted_at = datetime.now(timezone.utc)
     db.commit()
     return {
-        "message": "Ban đã xóa (mềm). Người dùng đã được chuyển sang 'Chưa phân công'."
+        "message": "Phòng đã xóa (mềm). Người dùng đã được chuyển sang 'Chưa phân công'."
     }

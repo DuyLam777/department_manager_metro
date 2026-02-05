@@ -4,16 +4,21 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 
 from app.config.database import get_db
-from app.domain.department import Department
 from app.domain.sub_department import SubDepartment
 from app.domain.user import User
-from app.repo import user_repo
+from app.domain.user_sub_department import UserSubDepartment
+from app.repo import department_repo, user_repo
 from app.service.auth_service import hash_password
 
 router = APIRouter(prefix="/users", tags=["users"])
+
+
+class SubDepartmentAssignment(BaseModel):
+    sub_department_id: int
+    position: str | None = None
 
 
 class UserCreateRequest(BaseModel):
@@ -22,9 +27,8 @@ class UserCreateRequest(BaseModel):
     first_name: str | None = None
     last_name: str | None = None
     profile_img: str | None = None
-    department_id: int | None = None
-    sub_department_id: int | None = None
-    position: str | None = None
+    # List of sub-department assignments with positions
+    sub_department_assignments: list[SubDepartmentAssignment] = []
     is_admin: bool = False  # Whether to create as admin
 
 
@@ -34,9 +38,8 @@ class UserUpdateRequest(BaseModel):
     first_name: str | None = None
     last_name: str | None = None
     profile_img: str | None = None
-    department_id: int | None = None
-    sub_department_id: int | None = None
-    position: str | None = None
+    # List of sub-department assignments with positions (replaces all existing)
+    sub_department_assignments: list[SubDepartmentAssignment] | None = None
 
 
 def generate_random_password(length: int = 12) -> str:
@@ -45,24 +48,48 @@ def generate_random_password(length: int = 12) -> str:
     return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
-def _effective_department_name(u: User) -> str | None:
-    """Department that owns the user: direct department or sub_department's department."""
-    if u.sub_department and u.sub_department.department:
-        return u.sub_department.department.name
-    if u.department:
-        return u.department.name
-    return None
-
-
 def user_to_dict(u: User, include_deleted_at: bool = False) -> dict:
     """Convert user model to response dict.
 
-    Notes:
-    - `department` label renamed to `bo_phan` (Bộ phận).
-    - `effective_department` renamed to `effective_bo_phan`.
-    - Include `position` (Chức vụ) in responses.
-    - Username is only included for admin users (regular users don't have one).
+    The response includes:
+    - Basic user info (id, username, email, name, etc.)
+    - sub_department_assignments: list of {sub_department_id, sub_department_name,
+      department_id, department_name, position}
+    - For backwards compatibility, also includes primary assignment info
     """
+    # Get all sub-department assignments
+    assignments = []
+    primary_dept_name = None
+    primary_sub_dept_name = None
+    primary_sub_dept_id = None
+    primary_dept_id = None
+    primary_position = None
+
+    for assignment in u.sub_department_assignments:
+        sub_dept = assignment.sub_department
+        if sub_dept and not sub_dept.deleted:
+            dept = sub_dept.department
+            dept_name = dept.name if dept and not dept.deleted else None
+            dept_id = dept.id if dept and not dept.deleted else None
+
+            assignment_dict = {
+                "sub_department_id": sub_dept.id,
+                "sub_department_name": sub_dept.name,
+                "department_id": dept_id,
+                "department_name": dept_name,
+                "position": assignment.position,
+                "is_placeholder": sub_dept.is_placeholder,
+            }
+            assignments.append(assignment_dict)
+
+            # Use first non-placeholder assignment as primary
+            if primary_dept_name is None and not sub_dept.is_placeholder:
+                primary_dept_name = dept_name
+                primary_dept_id = dept_id
+                primary_sub_dept_name = sub_dept.name
+                primary_sub_dept_id = sub_dept.id
+                primary_position = assignment.position
+
     result = {
         "id": u.id,
         "username": u.username if u.is_admin else None,  # Only admins have username
@@ -71,18 +98,17 @@ def user_to_dict(u: User, include_deleted_at: bool = False) -> dict:
         "last_name": u.last_name,
         "profile_img": u.profile_img,
         "is_admin": u.is_admin,
-        # Renamed: department -> bo_phan
-        "bo_phan": u.department.name if u.department else None,
-        "department_id": u.department_id,
-        "sub_department": u.sub_department.name if u.sub_department else None,
-        "sub_department_id": u.sub_department_id,
-        # Renamed: effective_department -> effective_bo_phan
-        "effective_bo_phan": _effective_department_name(u),
-        # Position/title field
-        "position": u.position,
+        # All sub-department assignments with positions
+        "sub_department_assignments": assignments,
+        # Primary/first assignment for backwards compatibility
+        "bo_phan": primary_dept_name,
+        "department_id": primary_dept_id,
+        "sub_department": primary_sub_dept_name,
+        "sub_department_id": primary_sub_dept_id,
+        "effective_bo_phan": primary_dept_name,
+        "position": primary_position,
     }
     if include_deleted_at:
-        # Use an explicit None check to avoid relying on truthiness of SQLAlchemy Column values
         result["deleted_at"] = (
             u.deleted_at.isoformat() if u.deleted_at is not None else None
         )
@@ -92,7 +118,7 @@ def user_to_dict(u: User, include_deleted_at: bool = False) -> dict:
 @router.get("")
 def list_users(
     department_id: int | None = Query(
-        None, description="Filter by department (direct + its sub-departments)"
+        None, description="Filter by department (users in its sub-departments)"
     ),
     sub_department_id: int | None = Query(None, description="Filter by sub-department"),
     db: Session = Depends(get_db),
@@ -127,34 +153,21 @@ def create_user(request: UserCreateRequest, db: Session = Depends(get_db)):
         if existing:
             raise HTTPException(status_code=400, detail="Email already taken")
 
-    # User must have at most one of department_id or sub_department_id
-    if request.department_id and request.sub_department_id:
-        raise HTTPException(
-            status_code=400,
-            detail="User can have either a department or a sub-department, not both",
-        )
-    if request.department_id:
-        dept = (
-            db.query(Department)
-            .filter(
-                Department.id == request.department_id,
-                Department.deleted == False,
-            )
-            .first()
-        )
-        if not dept:
-            raise HTTPException(status_code=400, detail="Department not found")
-    if request.sub_department_id:
+    # Validate sub-department IDs
+    for assignment in request.sub_department_assignments:
         sub = (
             db.query(SubDepartment)
             .filter(
-                SubDepartment.id == request.sub_department_id,
+                SubDepartment.id == assignment.sub_department_id,
                 SubDepartment.deleted == False,
             )
             .first()
         )
         if not sub:
-            raise HTTPException(status_code=400, detail="Sub-department not found")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Sub-department {assignment.sub_department_id} not found",
+            )
 
     # Only generate password for admin users
     plain_password = None
@@ -163,7 +176,7 @@ def create_user(request: UserCreateRequest, db: Session = Depends(get_db)):
         plain_password = generate_random_password()
         password_hash = hash_password(plain_password)
 
-    # Create user (store only one of department_id or sub_department_id)
+    # Create user
     user = User(
         username=request.username if request.is_admin else None,
         email=request.email,
@@ -171,15 +184,21 @@ def create_user(request: UserCreateRequest, db: Session = Depends(get_db)):
         last_name=request.last_name,
         profile_img=request.profile_img,
         password_hash=password_hash,
-        department_id=request.department_id if request.department_id else None,
-        sub_department_id=request.sub_department_id
-        if request.sub_department_id
-        else None,
-        position=request.position,
         is_admin=request.is_admin,
     )
 
     db.add(user)
+    db.flush()  # Get user ID
+
+    # Create sub-department assignments
+    for assignment in request.sub_department_assignments:
+        user_sub_dept = UserSubDepartment(
+            user_id=user.id,
+            sub_department_id=assignment.sub_department_id,
+            position=assignment.position,
+        )
+        db.add(user_sub_dept)
+
     db.commit()
     db.refresh(user)
 
@@ -193,15 +212,7 @@ def create_user(request: UserCreateRequest, db: Session = Depends(get_db)):
 @router.get("/{user_id}")
 def get_user(user_id: int, db: Session = Depends(get_db)):
     """Get a single user by ID."""
-    user = (
-        db.query(User)
-        .filter(User.id == user_id, User.deleted == False)
-        .options(
-            joinedload(User.department),
-            joinedload(User.sub_department).joinedload(SubDepartment.department),
-        )
-        .first()
-    )
+    user = user_repo.get_user_by_id(db, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -213,15 +224,7 @@ def update_user(
     user_id: int, request: UserUpdateRequest, db: Session = Depends(get_db)
 ):
     """Update a user's information. Admin only (enforced by frontend for now)."""
-    user = (
-        db.query(User)
-        .filter(User.id == user_id, User.deleted == False)
-        .options(
-            joinedload(User.department),
-            joinedload(User.sub_department).joinedload(SubDepartment.department),
-        )
-        .first()
-    )
+    user = user_repo.get_user_by_id(db, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -258,47 +261,37 @@ def update_user(
     if request.profile_img is not None:
         user.profile_img = request.profile_img
 
-    if request.position is not None:
-        user.position = request.position
-
-    if request.department_id is not None or request.sub_department_id is not None:
-        # Resolve: user can have only one of department or sub_department
-        new_dept_id = request.department_id
-        new_sub_id = request.sub_department_id
-        if new_dept_id and new_sub_id:
-            raise HTTPException(
-                status_code=400,
-                detail="User can have either a department or a sub-department, not both",
-            )
-        if new_dept_id:
-            dept = (
-                db.query(Department)
-                .filter(
-                    Department.id == new_dept_id,
-                    Department.deleted == False,
-                )
-                .first()
-            )
-            if not dept:
-                raise HTTPException(status_code=400, detail="Department not found")
-            user.department_id = new_dept_id
-            user.sub_department_id = None
-        elif new_sub_id is not None:
+    # Update sub-department assignments if provided
+    if request.sub_department_assignments is not None:
+        # Validate new sub-department IDs
+        for assignment in request.sub_department_assignments:
             sub = (
                 db.query(SubDepartment)
                 .filter(
-                    SubDepartment.id == new_sub_id,
+                    SubDepartment.id == assignment.sub_department_id,
                     SubDepartment.deleted == False,
                 )
                 .first()
             )
             if not sub:
-                raise HTTPException(status_code=400, detail="Sub-department not found")
-            user.sub_department_id = new_sub_id
-            user.department_id = None
-        else:
-            user.department_id = None
-            user.sub_department_id = None
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Sub-department {assignment.sub_department_id} not found",
+                )
+
+        # Delete existing assignments
+        db.query(UserSubDepartment).filter(
+            UserSubDepartment.user_id == user_id
+        ).delete()
+
+        # Create new assignments
+        for assignment in request.sub_department_assignments:
+            user_sub_dept = UserSubDepartment(
+                user_id=user_id,
+                sub_department_id=assignment.sub_department_id,
+                position=assignment.position,
+            )
+            db.add(user_sub_dept)
 
     db.commit()
     db.refresh(user)
@@ -413,6 +406,9 @@ def permanent_delete_user(user_id: int, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail="Deleted user not found")
 
+    # Delete sub-department assignments first
+    db.query(UserSubDepartment).filter(UserSubDepartment.user_id == user_id).delete()
+
     db.delete(user)
     db.commit()
 
@@ -435,6 +431,10 @@ def cleanup_deleted_users(days: int = 30, db: Session = Depends(get_db)):
     count = len(old_deleted_users)
 
     for user in old_deleted_users:
+        # Delete sub-department assignments first
+        db.query(UserSubDepartment).filter(
+            UserSubDepartment.user_id == user.id
+        ).delete()
         db.delete(user)
 
     db.commit()

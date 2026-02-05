@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, Integer, String
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -15,18 +15,44 @@ class User(Base):
     last_name = Column(String, nullable=True)
     password_hash = Column(String, nullable=True)  # Only for admins
     profile_img = Column(String, nullable=True)
-    position = Column(String, nullable=True)
     is_admin = Column(Boolean, default=False)
     deleted = Column(Boolean, default=False)
     deleted_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    # Foreign key: user belongs to one department (direct) OR one sub_department
-    department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
-    sub_department_id = Column(Integer, ForeignKey("sub_departments.id"), nullable=True)
+    # Many-to-many relationship with sub-departments through UserSubDepartment
+    # Each assignment has its own position
+    sub_department_assignments = relationship(
+        "UserSubDepartment",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
 
-    # Relationship: user belongs to one department (when assigned directly)
-    department = relationship("Department", back_populates="users")
-    # Relationship: user belongs to one sub_department (when assigned to sub)
-    sub_department = relationship("SubDepartment", back_populates="users")
+    @property
+    def sub_departments(self):
+        """Get all sub-departments this user belongs to."""
+        return [
+            assignment.sub_department for assignment in self.sub_department_assignments
+        ]
+
+    @property
+    def departments(self):
+        """Get all unique departments this user belongs to (through sub-departments)."""
+        dept_ids_seen = set()
+        depts = []
+        for assignment in self.sub_department_assignments:
+            if assignment.sub_department and assignment.sub_department.department:
+                dept = assignment.sub_department.department
+                if dept.id not in dept_ids_seen:
+                    dept_ids_seen.add(dept.id)
+                    depts.append(dept)
+        return depts
+
+    def get_position_in_sub_department(self, sub_department_id: int) -> str | None:
+        """Get the user's position in a specific sub-department."""
+        for assignment in self.sub_department_assignments:
+            if assignment.sub_department_id == sub_department_id:
+                return assignment.position
+        return None

@@ -555,6 +555,12 @@
         margin-top: 0.25rem;
     }
 
+    .manage-dept-actions .btn-edit,
+    .manage-dept-actions .btn-delete {
+        min-height: 44px;
+        padding: 0.5rem 0.875rem;
+    }
+
     .manage-dept-form-inline .form-actions,
     .manage-sub-form-inline .form-actions {
         flex-wrap: wrap;
@@ -576,8 +582,8 @@
     }
 
     .unassigned-user-row input[type="checkbox"] {
-        min-width: 1.125rem;
-        min-height: 1.125rem;
+        min-width: 1.25rem;
+        min-height: 1.25rem;
     }
 
     .btn-add-users-to-dept {
@@ -602,9 +608,81 @@
         margin-top: 0.25rem;
     }
 
+    .manage-sub-actions .btn-edit,
+    .manage-sub-actions .btn-delete {
+        min-height: 44px;
+        padding: 0.375rem 0.75rem;
+    }
+
     .manage-dept-close-btn {
         min-width: 44px;
         min-height: 44px;
         padding: 0.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .btn-add-dept {
+        min-height: 44px;
+    }
+
+    .btn-add-sub {
+        min-height: 44px;
+        padding: 0.625rem 0.75rem;
+    }
+
+    .manage-departments-modal .form-group input,
+    .manage-departments-modal .form-group select {
+        min-height: 44px;
+        font-size: 1rem;
+    }
+
+    .manage-departments-modal .btn-cancel,
+    .manage-departments-modal .btn-save {
+        min-height: 44px;
+        padding: 0.625rem 1rem;
+        flex: 1;
+    }
+
+    .dept-img-upload {
+        flex-wrap: wrap;
+    }
+
+    .btn-upload-img,
+    .btn-remove-img {
+        min-height: 44px;
+        padding: 0.5rem 0.875rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .manage-departments-modal {
+        max-height: 90vh;
+        margin: 0.5rem;
+        padding: 0.875rem 1rem;
+    }
+
+    .manage-dept-modal-header h2 {
+        font-size: 1.1rem;
+    }
+
+    .manage-dept-card {
+        padding: 0.875rem;
+    }
+
+    .manage-dept-name {
+        font-size: 0.95rem;
+    }
+
+    .manage-sub-name {
+        font-size: 0.85rem;
+    }
+
+    .manage-dept-form-card,
+    .manage-dept-form-inline,
+    .manage-sub-form,
+    .manage-sub-form-inline {
+        padding: 0.875rem;
     }
 }

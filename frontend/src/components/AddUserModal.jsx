@@ -4,8 +4,7 @@ import "./AddUserModal.css";
 
 export function AddUserModal({
   departments,
-  defaultDepartmentId,
-  defaultSubDepartmentId,
+  defaultSubDepartmentIds = [],
   token,
   onClose,
   onUserCreated,
@@ -14,21 +13,76 @@ export function AddUserModal({
   const [error, setError] = useState(null);
   const [generatedPassword, setGeneratedPassword] = useState(null);
 
-  // Form state: one of department_id or sub_department_id (value like "dept-1" or "sub-2")
-  const initialPlace = defaultSubDepartmentId
-    ? `sub-${defaultSubDepartmentId}`
-    : defaultDepartmentId
-      ? `dept-${defaultDepartmentId}`
-      : "";
+  // Form state
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [position, setPosition] = useState("");
   const [profileImg, setProfileImg] = useState("");
-  const [departmentOrSub, setDepartmentOrSub] = useState(initialPlace);
   const [cropImageSrc, setCropImageSrc] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
+
+  // Sub-department assignments: array of { sub_department_id, position }
+  const initialAssignments = defaultSubDepartmentIds.map((id) => ({
+    sub_department_id: id,
+    position: "",
+  }));
+  const [assignments, setAssignments] = useState(
+    initialAssignments.length > 0 ? initialAssignments : [],
+  );
+
+  // Track if user was created successfully (for non-admin users without password)
+  const [createdUser, setCreatedUser] = useState(null);
+
+  // Get all sub-departments flattened for selection
+  const getAllSubDepartments = () => {
+    const subs = [];
+    departments.forEach((dept) => {
+      if (!dept.is_placeholder) {
+        (dept.sub_departments || []).forEach((sub) => {
+          subs.push({
+            ...sub,
+            departmentName: dept.name,
+            departmentId: dept.id,
+          });
+        });
+      }
+    });
+    return subs;
+  };
+
+  const allSubDepartments = getAllSubDepartments();
+
+  // Get sub-departments that haven't been selected yet
+  const getAvailableSubDepartments = (excludeIndex = -1) => {
+    const selectedIds = assignments
+      .filter((_, idx) => idx !== excludeIndex)
+      .map((a) => a.sub_department_id);
+    return allSubDepartments.filter((s) => !selectedIds.includes(s.id));
+  };
+
+  // Add a new assignment
+  const addAssignment = () => {
+    const available = getAvailableSubDepartments();
+    if (available.length > 0) {
+      setAssignments([
+        ...assignments,
+        { sub_department_id: available[0].id, position: "" },
+      ]);
+    }
+  };
+
+  // Remove an assignment
+  const removeAssignment = (index) => {
+    setAssignments(assignments.filter((_, idx) => idx !== index));
+  };
+
+  // Update an assignment
+  const updateAssignment = (index, field, value) => {
+    const updated = [...assignments];
+    updated[index] = { ...updated[index], [field]: value };
+    setAssignments(updated);
+  };
 
   // Check if form has any data entered
   const hasUnsavedChanges = () => {
@@ -37,9 +91,8 @@ export function AddUserModal({
       email.trim() !== "" ||
       firstName.trim() !== "" ||
       lastName.trim() !== "" ||
-      position.trim() !== "" ||
       profileImg !== "" ||
-      departmentOrSub !== initialPlace ||
+      assignments.length !== initialAssignments.length ||
       isAdmin
     );
   };
@@ -61,11 +114,13 @@ export function AddUserModal({
     setError(null);
 
     try {
-      const [departmentId, subDepartmentId] = departmentOrSub.startsWith("sub-")
-        ? [null, parseInt(departmentOrSub.slice(4), 10)]
-        : departmentOrSub.startsWith("dept-")
-          ? [parseInt(departmentOrSub.slice(5), 10), null]
-          : [null, null];
+      // Build sub_department_assignments array
+      const subDeptAssignments = assignments
+        .filter((a) => a.sub_department_id)
+        .map((a) => ({
+          sub_department_id: a.sub_department_id,
+          position: a.position || null,
+        }));
 
       const response = await fetch("/api/users", {
         method: "POST",
@@ -78,10 +133,8 @@ export function AddUserModal({
           email: email || null,
           first_name: firstName || null,
           last_name: lastName || null,
-          position: position || null,
           profile_img: profileImg || null,
-          department_id: departmentId,
-          sub_department_id: subDepartmentId,
+          sub_department_assignments: subDeptAssignments,
           is_admin: isAdmin,
         }),
       });
@@ -108,9 +161,6 @@ export function AddUserModal({
   const copyPassword = () => {
     navigator.clipboard.writeText(generatedPassword);
   };
-
-  // Track if user was created successfully (for non-admin users without password)
-  const [createdUser, setCreatedUser] = useState(null);
 
   // Show success screen
   if (generatedPassword || createdUser) {
@@ -266,35 +316,78 @@ export function AddUserModal({
             />
           </div>
 
+          {/* Sub-department assignments */}
           <div className="form-group">
-            <label htmlFor="position">Chức vụ</label>
-            <input
-              id="position"
-              type="text"
-              value={position}
-              onChange={(e) => setPosition(e.target.value)}
-            />
-          </div>
+            <label>Phòng / Chức vụ</label>
+            <div className="assignments-list">
+              {assignments.map((assignment, index) => {
+                const available = getAvailableSubDepartments(index);
+                const currentSub = allSubDepartments.find(
+                  (s) => s.id === assignment.sub_department_id,
+                );
+                // Include current selection in dropdown options
+                const options = currentSub
+                  ? [
+                      currentSub,
+                      ...available.filter((s) => s.id !== currentSub.id),
+                    ]
+                  : available;
 
-          <div className="form-group">
-            <label htmlFor="department">Bộ phận / Ban</label>
-            <select
-              id="department"
-              value={departmentOrSub}
-              onChange={(e) => setDepartmentOrSub(e.target.value)}
-            >
-              <option value="">Không có bộ phận</option>
-              {departments.map((dept) => (
-                <optgroup key={dept.id} label={dept.name}>
-                  <option value={`dept-${dept.id}`}>{dept.name}</option>
-                  {(dept.sub_departments || []).map((sub) => (
-                    <option key={`sub-${sub.id}`} value={`sub-${sub.id}`}>
-                      — {sub.name}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
+                return (
+                  <div key={index} className="assignment-row">
+                    <select
+                      value={assignment.sub_department_id || ""}
+                      onChange={(e) =>
+                        updateAssignment(
+                          index,
+                          "sub_department_id",
+                          parseInt(e.target.value, 10),
+                        )
+                      }
+                      className="assignment-select"
+                    >
+                      <option value="">Chọn Phòng...</option>
+                      {options.map((sub) => (
+                        <option key={sub.id} value={sub.id}>
+                          {sub.name} ({sub.departmentName})
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="text"
+                      placeholder="Chức vụ"
+                      value={assignment.position}
+                      onChange={(e) =>
+                        updateAssignment(index, "position", e.target.value)
+                      }
+                      className="assignment-position"
+                    />
+                    <button
+                      type="button"
+                      className="btn-remove-assignment"
+                      onClick={() => removeAssignment(index)}
+                      title="Xóa"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                );
+              })}
+              {getAvailableSubDepartments().length > 0 && (
+                <button
+                  type="button"
+                  className="btn-add-assignment"
+                  onClick={addAssignment}
+                >
+                  + Thêm Phòng
+                </button>
+              )}
+              {assignments.length === 0 && (
+                <p className="form-note">
+                  Người dùng chưa được gán vào Phòng nào.
+                </p>
+              )}
+            </div>
           </div>
 
           <div className="form-group checkbox-group">

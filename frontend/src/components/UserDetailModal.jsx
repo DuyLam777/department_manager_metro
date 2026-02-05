@@ -29,18 +29,69 @@ export function UserDetailModal({
   // Original values to detect changes
   const [originalValues, setOriginalValues] = useState(null);
 
-  // Form state: "dept-1" or "sub-2" for department/sub_department
+  // Form state
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [profileImg, setProfileImg] = useState("");
-  const [departmentOrSub, setDepartmentOrSub] = useState("");
-  const [position, setPosition] = useState("");
   const [cropImageSrc, setCropImageSrc] = useState(null);
+
+  // Sub-department assignments: array of { sub_department_id, position }
+  const [assignments, setAssignments] = useState([]);
 
   // Check if editing self
   const isEditingSelf = userId === currentUserId;
+
+  // Get all sub-departments flattened for selection
+  const getAllSubDepartments = () => {
+    const subs = [];
+    departments.forEach((dept) => {
+      if (!dept.is_placeholder) {
+        (dept.sub_departments || []).forEach((sub) => {
+          subs.push({
+            ...sub,
+            departmentName: dept.name,
+            departmentId: dept.id,
+          });
+        });
+      }
+    });
+    return subs;
+  };
+
+  const allSubDepartments = getAllSubDepartments();
+
+  // Get sub-departments that haven't been selected yet
+  const getAvailableSubDepartments = (excludeIndex = -1) => {
+    const selectedIds = assignments
+      .filter((_, idx) => idx !== excludeIndex)
+      .map((a) => a.sub_department_id);
+    return allSubDepartments.filter((s) => !selectedIds.includes(s.id));
+  };
+
+  // Add a new assignment
+  const addAssignment = () => {
+    const available = getAvailableSubDepartments();
+    if (available.length > 0) {
+      setAssignments([
+        ...assignments,
+        { sub_department_id: available[0].id, position: "" },
+      ]);
+    }
+  };
+
+  // Remove an assignment
+  const removeAssignment = (index) => {
+    setAssignments(assignments.filter((_, idx) => idx !== index));
+  };
+
+  // Update an assignment
+  const updateAssignment = (index, field, value) => {
+    const updated = [...assignments];
+    updated[index] = { ...updated[index], [field]: value };
+    setAssignments(updated);
+  };
 
   useEffect(() => {
     fetchUser();
@@ -60,13 +111,15 @@ export function UserDetailModal({
       setFirstName(data.first_name || "");
       setLastName(data.last_name || "");
       setProfileImg(data.profile_img || "");
-      setPosition(data.position || "");
-      const place = data.sub_department_id
-        ? `sub-${data.sub_department_id}`
-        : data.department_id
-          ? `dept-${data.department_id}`
-          : "";
-      setDepartmentOrSub(place);
+
+      // Parse sub_department_assignments
+      const assignmentsData = (data.sub_department_assignments || [])
+        .filter((a) => !a.is_placeholder)
+        .map((a) => ({
+          sub_department_id: a.sub_department_id,
+          position: a.position || "",
+        }));
+      setAssignments(assignmentsData);
 
       // Store original values for change detection
       setOriginalValues({
@@ -75,8 +128,7 @@ export function UserDetailModal({
         firstName: data.first_name || "",
         lastName: data.last_name || "",
         profileImg: data.profile_img || "",
-        departmentOrSub: place,
-        position: data.position || "",
+        assignments: JSON.stringify(assignmentsData),
       });
     } catch (err) {
       setError(err.message);
@@ -94,8 +146,7 @@ export function UserDetailModal({
       firstName !== originalValues.firstName ||
       lastName !== originalValues.lastName ||
       profileImg !== originalValues.profileImg ||
-      departmentOrSub !== originalValues.departmentOrSub ||
-      position !== originalValues.position
+      JSON.stringify(assignments) !== originalValues.assignments
     );
   };
 
@@ -121,21 +172,20 @@ export function UserDetailModal({
     setSaving(true);
     setError(null);
     try {
-      const [departmentId, subDepartmentId] = departmentOrSub.startsWith("sub-")
-        ? [null, parseInt(departmentOrSub.slice(4), 10)]
-        : departmentOrSub.startsWith("dept-")
-          ? [parseInt(departmentOrSub.slice(5), 10), null]
-          : [null, null];
+      // Build sub_department_assignments array
+      const subDeptAssignments = assignments
+        .filter((a) => a.sub_department_id)
+        .map((a) => ({
+          sub_department_id: a.sub_department_id,
+          position: a.position || null,
+        }));
 
-      // Only include username for admin users
       const updateData = {
         email: email || null,
         first_name: firstName || null,
         last_name: lastName || null,
         profile_img: profileImg || null,
-        department_id: departmentId,
-        sub_department_id: subDepartmentId,
-        position: position || null,
+        sub_department_assignments: subDeptAssignments,
       };
 
       // Only update username for admin users (they're the only ones with usernames)
@@ -274,6 +324,17 @@ export function UserDetailModal({
     }
   };
 
+  // Get department info display for read-only view
+  const getDepartmentInfoDisplay = () => {
+    const userAssignments = (user?.sub_department_assignments || []).filter(
+      (a) => !a.is_placeholder,
+    );
+    if (userAssignments.length === 0) {
+      return null;
+    }
+    return userAssignments;
+  };
+
   if (loading) {
     return (
       <div className="modal-overlay" onClick={handleClose}>
@@ -288,6 +349,7 @@ export function UserDetailModal({
   }
 
   const displayName = getDisplayName();
+  const departmentInfo = getDepartmentInfoDisplay();
 
   return (
     <div className="modal-overlay" onClick={handleClose}>
@@ -334,33 +396,50 @@ export function UserDetailModal({
           {user?.is_admin && <span className="admin-tag">Quản trị viên</span>}
         </div>
 
-        {(user?.effective_department || user?.department || user?.position) && (
+        {/* Department info display (read-only summary) */}
+        {departmentInfo && departmentInfo.length > 0 && !isAdmin && (
           <div className="user-department-display">
-            <div className="department-display-row">
-              <span className="department-display-label">Bộ phận:</span>
-              <span className="department-display-value">
-                {user.effective_bo_phan ||
-                  user.effective_department ||
-                  user.department ||
-                  user.bo_phan ||
-                  "-"}
-              </span>
-            </div>
-            {user?.sub_department && (
-              <div className="department-display-row">
-                <span className="department-display-label">Ban:</span>
-                <span className="department-display-value">
-                  {user.sub_department}
+            {departmentInfo.length === 1 ? (
+              <>
+                <div className="department-display-row">
+                  <span className="department-display-label">Bộ phận:</span>
+                  <span className="department-display-value">
+                    {departmentInfo[0].department_name || "-"}
+                  </span>
+                </div>
+                <div className="department-display-row">
+                  <span className="department-display-label">Phòng:</span>
+                  <span className="department-display-value">
+                    {departmentInfo[0].sub_department_name || "-"}
+                  </span>
+                </div>
+                <div className="department-display-row">
+                  <span className="department-display-label">Chức vụ:</span>
+                  <span className="department-display-value">
+                    {departmentInfo[0].position ||
+                      (user.is_admin ? "Quản trị viên" : "Người dùng")}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div className="department-display-multi">
+                <span className="department-display-label">
+                  Các Phòng ({departmentInfo.length}):
                 </span>
+                <div className="department-assignments-list">
+                  {departmentInfo.map((a, idx) => (
+                    <div key={idx} className="department-assignment-item">
+                      <span className="assignment-dept">
+                        {a.sub_department_name} ({a.department_name})
+                      </span>
+                      <span className="assignment-position">
+                        {a.position || "Chưa có chức vụ"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
-            <div className="department-display-row">
-              <span className="department-display-label">Chức vụ:</span>
-              <span className="department-display-value">
-                {user.position ||
-                  (user.is_admin ? "Quản trị viên" : "Người dùng")}
-              </span>
-            </div>
           </div>
         )}
 
@@ -416,38 +495,81 @@ export function UserDetailModal({
           />
         </div>
 
-        <div className="form-group">
-          <label htmlFor="position">Chức vụ</label>
-          <input
-            id="position"
-            type="text"
-            value={position}
-            onChange={(e) => setPosition(e.target.value)}
-            disabled={!isAdmin}
-          />
-        </div>
+        {/* Sub-department assignments - editable for admin */}
+        {isAdmin && (
+          <div className="form-group">
+            <label>Phòng / Chức vụ</label>
+            <div className="assignments-list">
+              {assignments.map((assignment, index) => {
+                const available = getAvailableSubDepartments(index);
+                const currentSub = allSubDepartments.find(
+                  (s) => s.id === assignment.sub_department_id,
+                );
+                // Include current selection in dropdown options
+                const options = currentSub
+                  ? [
+                      currentSub,
+                      ...available.filter((s) => s.id !== currentSub.id),
+                    ]
+                  : available;
 
-        <div className="form-group">
-          <label htmlFor="department">Bộ phận / Ban</label>
-          <select
-            id="department"
-            value={departmentOrSub}
-            onChange={(e) => setDepartmentOrSub(e.target.value)}
-            disabled={!isAdmin}
-          >
-            <option value="">Không có bộ phận</option>
-            {departments.map((dept) => (
-              <optgroup key={dept.id} label={dept.name}>
-                <option value={`dept-${dept.id}`}>{dept.name}</option>
-                {(dept.sub_departments || []).map((sub) => (
-                  <option key={`sub-${sub.id}`} value={`sub-${sub.id}`}>
-                    — {sub.name}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-        </div>
+                return (
+                  <div key={index} className="assignment-row">
+                    <select
+                      value={assignment.sub_department_id || ""}
+                      onChange={(e) =>
+                        updateAssignment(
+                          index,
+                          "sub_department_id",
+                          parseInt(e.target.value, 10),
+                        )
+                      }
+                      className="assignment-select"
+                    >
+                      <option value="">Chọn Phòng...</option>
+                      {options.map((sub) => (
+                        <option key={sub.id} value={sub.id}>
+                          {sub.name} ({sub.departmentName})
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="text"
+                      placeholder="Chức vụ"
+                      value={assignment.position}
+                      onChange={(e) =>
+                        updateAssignment(index, "position", e.target.value)
+                      }
+                      className="assignment-position"
+                    />
+                    <button
+                      type="button"
+                      className="btn-remove-assignment"
+                      onClick={() => removeAssignment(index)}
+                      title="Xóa"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                );
+              })}
+              {getAvailableSubDepartments().length > 0 && (
+                <button
+                  type="button"
+                  className="btn-add-assignment"
+                  onClick={addAssignment}
+                >
+                  + Thêm Phòng
+                </button>
+              )}
+              {assignments.length === 0 && (
+                <p className="form-note">
+                  Người dùng chưa được gán vào Phòng nào.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Only show password section for admin users being viewed, and only if current user is admin */}
         {isAdmin && user?.is_admin && (

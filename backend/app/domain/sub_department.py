@@ -22,5 +22,18 @@ class SubDepartment(Base):
 
     # Relationship: sub_department belongs to one department
     department = relationship("Department", back_populates="sub_departments")
-    # Relationship: sub_department has many users
-    users = relationship("User", back_populates="sub_department")
+
+    # Many-to-many relationship with users through UserSubDepartment
+    user_assignments = relationship(
+        "UserSubDepartment",
+        back_populates="sub_department",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
+    @property
+    def users(self):
+        """Get all users assigned to this sub-department."""
+        return [
+            assignment.user for assignment in self.user_assignments if assignment.user
+        ]

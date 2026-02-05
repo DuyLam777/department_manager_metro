@@ -38,6 +38,7 @@ function App() {
   const [showManageDepartmentsModal, setShowManageDepartmentsModal] =
     useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [appSettings, setAppSettings] = useState({
     app_title: "Phần mềm quản lý nhân sự",
     header_banner_img: null,
@@ -198,16 +199,18 @@ function App() {
     .filter((u) => {
       if (!selectedFilter) return true;
       if (selectedFilter.type === "department") {
-        // Prefer `effective_bo_phan` from backend; fall back to older fields if absent
-        const userDeptName =
-          u.effective_bo_phan ||
-          u.effective_department ||
-          u.bo_phan ||
-          u.department;
-        return userDeptName === selectedFilter.name;
+        // Check if user has any assignment in this department
+        const assignments = u.sub_department_assignments || [];
+        return assignments.some(
+          (a) => a.department_id === selectedFilter.id && !a.is_placeholder,
+        );
       }
       if (selectedFilter.type === "sub") {
-        return u.sub_department_id === selectedFilter.id;
+        // Check if user has an assignment in this sub-department
+        const assignments = u.sub_department_assignments || [];
+        return assignments.some(
+          (a) => a.sub_department_id === selectedFilter.id,
+        );
       }
       return true;
     })
@@ -238,15 +241,11 @@ function App() {
     fetchDepartments();
   };
 
-  // Get default department/sub for Add User when a filter is selected
-  const getDefaultDepartmentId = () => {
-    if (!selectedFilter) return null;
-    if (selectedFilter.type === "department") return selectedFilter.id;
-    return null;
-  };
-  const getDefaultSubDepartmentId = () => {
-    if (selectedFilter?.type === "sub") return selectedFilter.id;
-    return null;
+  // Get default sub-department for Add User when a filter is selected
+  const getDefaultSubDepartmentIds = () => {
+    if (!selectedFilter) return [];
+    if (selectedFilter.type === "sub") return [selectedFilter.id];
+    return [];
   };
 
   // Helper to get display name (full name)
@@ -271,24 +270,64 @@ function App() {
     return `${u.last_name || ""} ${u.first_name || ""}`.trim() || u.username;
   };
 
-  // Get users for a specific department (including sub-departments)
+  // Get user's position in a specific sub-department
+  const getUserPositionInSubDept = (u, subDeptId) => {
+    const assignments = u.sub_department_assignments || [];
+    const assignment = assignments.find(
+      (a) => a.sub_department_id === subDeptId,
+    );
+    return assignment?.position || null;
+  };
+
+  // Get user's department/position display for tooltip
+  const getUserDepartmentDisplay = (u) => {
+    const assignments = (u.sub_department_assignments || []).filter(
+      (a) => !a.is_placeholder,
+    );
+    if (assignments.length === 0) {
+      return { dept: "-", positions: [] };
+    }
+    if (assignments.length === 1) {
+      const a = assignments[0];
+      return {
+        dept: a.sub_department_name
+          ? `${a.sub_department_name} (${a.department_name || "-"})`
+          : a.department_name || "-",
+        positions: [{ subDept: a.sub_department_name, position: a.position }],
+      };
+    }
+    // Multiple assignments
+    return {
+      dept: `${assignments.length} Phòng`,
+      positions: assignments.map((a) => ({
+        subDept: a.sub_department_name,
+        deptName: a.department_name,
+        position: a.position,
+      })),
+    };
+  };
+
+  // Get users for a specific department (users who have any assignment in its sub-departments)
   const getUsersForDepartment = (deptId) => {
     const dept = departments.find((d) => d.id === deptId);
     if (!dept) return [];
     const subDeptIds = (dept.sub_departments || []).map((s) => s.id);
-    return allUsers.filter(
-      (u) =>
-        u.department_id === deptId ||
-        (u.sub_department_id && subDeptIds.includes(u.sub_department_id)),
-    );
+    return allUsers.filter((u) => {
+      const assignments = u.sub_department_assignments || [];
+      return assignments.some((a) => subDeptIds.includes(a.sub_department_id));
+    });
   };
 
   // Get users for a specific sub-department
   const getUsersForSubDepartment = (subDeptId) => {
-    return allUsers.filter((u) => u.sub_department_id === subDeptId);
+    return allUsers.filter((u) => {
+      const assignments = u.sub_department_assignments || [];
+      return assignments.some((a) => a.sub_department_id === subDeptId);
+    });
   };
 
   // Filter departments and users by overview search query
+  // Returns results grouped by department and sub-department like the normal view
   const getOverviewSearchResults = () => {
     if (!overviewSearchQuery.trim()) return null;
 
@@ -296,28 +335,82 @@ function App() {
     const assignedDepts = departments.filter((d) => !d.is_placeholder);
 
     assignedDepts.forEach((dept) => {
-      const deptUsers = getUsersForDepartment(dept.id);
-      const matchingUsers = deptUsers.filter((u) => {
-        const searchFields = [
-          u.first_name,
-          u.last_name,
-          `${u.first_name || ""} ${u.last_name || ""}`,
-          u.username,
-        ];
-        return searchFields.some((field) =>
-          fuzzyMatch(overviewSearchQuery, field),
-        );
+      const subDeptResults = [];
+
+      // Group matching users by sub-department
+      (dept.sub_departments || []).forEach((sub) => {
+        const subUsers = getUsersForSubDepartment(sub.id);
+        const matchingUsers = subUsers.filter((u) => {
+          const searchFields = [
+            u.first_name,
+            u.last_name,
+            `${u.first_name || ""} ${u.last_name || ""}`,
+            u.username,
+          ];
+          return searchFields.some((field) =>
+            fuzzyMatch(overviewSearchQuery, field),
+          );
+        });
+
+        if (matchingUsers.length > 0) {
+          subDeptResults.push({
+            subDepartment: sub,
+            users: matchingUsers,
+          });
+        }
       });
 
-      if (matchingUsers.length > 0) {
+      if (subDeptResults.length > 0) {
         results.push({
           department: dept,
-          users: matchingUsers,
+          subDepartments: subDeptResults,
         });
       }
     });
 
     return results;
+  };
+
+  // Render user tooltip content
+  const renderUserTooltip = (u, subDeptId = null) => {
+    const hoverName = getHoverName(u);
+    const deptInfo = getUserDepartmentDisplay(u);
+    const positionToShow = subDeptId
+      ? getUserPositionInSubDept(u, subDeptId)
+      : u.position;
+
+    return (
+      <div className="user-tooltip">
+        <div className="tooltip-row">
+          <span className="tooltip-label">Họ và tên:</span>
+          <span>{hoverName}</span>
+        </div>
+        <div className="tooltip-row">
+          <span className="tooltip-label">Bộ phận:</span>
+          <span>{deptInfo.dept}</span>
+        </div>
+        {deptInfo.positions.length > 1 ? (
+          <div className="tooltip-row tooltip-positions">
+            <span className="tooltip-label">Chức vụ:</span>
+            <div className="tooltip-positions-list">
+              {deptInfo.positions.map((p, idx) => (
+                <div key={idx} className="tooltip-position-item">
+                  <span className="tooltip-subdept">{p.subDept}:</span>
+                  <span>{p.position || "Chưa có"}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="tooltip-row">
+            <span className="tooltip-label">Chức vụ:</span>
+            <span>
+              {positionToShow || (u.is_admin ? "Quản trị viên" : "Người dùng")}
+            </span>
+          </div>
+        )}
+      </div>
+    );
   };
 
   if (authLoading) {
@@ -356,8 +449,7 @@ function App() {
       {showAddUserModal && (
         <AddUserModal
           departments={departments}
-          defaultDepartmentId={getDefaultDepartmentId()}
-          defaultSubDepartmentId={getDefaultSubDepartmentId()}
+          defaultSubDepartmentIds={getDefaultSubDepartmentIds()}
           token={getToken()}
           onClose={() => setShowAddUserModal(false)}
           onUserCreated={handleUserCreated}
@@ -394,11 +486,39 @@ function App() {
       )}
 
       <div className="layout">
+        {/* Mobile sidebar overlay */}
+        <div
+          className={`sidebar-overlay ${sidebarOpen ? "active" : ""}`}
+          onClick={() => setSidebarOpen(false)}
+        />
+
+        {/* Mobile burger menu button */}
+        <button
+          type="button"
+          className="burger-menu"
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          aria-label="Toggle sidebar"
+        >
+          <span className="burger-line" />
+          <span className="burger-line" />
+          <span className="burger-line" />
+        </button>
+
         <aside
-          className="sidebar"
+          className={`sidebar ${sidebarOpen ? "open" : ""}`}
           style={{ backgroundColor: appSettings.sidebar_bg_color }}
         >
-          <h2>Bộ phận</h2>
+          <div className="sidebar-header">
+            <h2>Bộ phận</h2>
+            <button
+              type="button"
+              className="sidebar-close-btn"
+              onClick={() => setSidebarOpen(false)}
+              aria-label="Close sidebar"
+            >
+              &times;
+            </button>
+          </div>
           <div className="sidebar-dept-search">
             <input
               type="text"
@@ -422,7 +542,10 @@ function App() {
             <li>
               <div
                 className={`department-item ${!selectedFilter ? "active" : ""}`}
-                onClick={() => setSelectedFilter(null)}
+                onClick={() => {
+                  setSelectedFilter(null);
+                  setSidebarOpen(false);
+                }}
               >
                 Tất cả bộ phận
                 <span className="user-count">
@@ -461,6 +584,7 @@ function App() {
                           return next;
                         });
                       }
+                      setSidebarOpen(false);
                     }}
                   >
                     <span className="department-label">
@@ -511,6 +635,7 @@ function App() {
                             };
                             setSelectedFilter(filter);
                             fetchUsersForFilter(filter);
+                            setSidebarOpen(false);
                           }}
                         >
                           {sub.name}
@@ -547,7 +672,7 @@ function App() {
           ) : !selectedFilter ? (
             <>
               <div className="content-header">
-                <h1>Bộ phận &amp; Ban</h1>
+                <h1>Bộ phận &amp; Phòng</h1>
                 <div className="header-actions">
                   <div className="search-box">
                     <input
@@ -578,7 +703,7 @@ function App() {
                 </div>
               </div>
 
-              {/* Search results view */}
+              {/* Search results view - grouped by department and sub-department */}
               {overviewSearchQuery.trim() ? (
                 <div className="departments-overview">
                   {(() => {
@@ -588,83 +713,85 @@ function App() {
                         <p className="no-users">Không tìm thấy người dùng</p>
                       );
                     }
-                    return searchResults.map(({ department, users }) => (
-                      <div
-                        key={department.id}
-                        className="department-overview-card"
-                      >
-                        <div className="department-overview-header">
-                          <span className="department-overview-name">
-                            {department.name}
-                          </span>
-                          <span className="department-overview-count">
-                            {users.length} kết quả
-                          </span>
-                        </div>
-                        <div className="user-grid overview-user-grid">
-                          {users.map((u) => {
-                            const abbreviatedName = getAbbreviatedName(u);
-                            const hoverName = getHoverName(u);
-                            return (
-                              <div
-                                key={u.id}
-                                className="user-card"
-                                onClick={() => setSelectedUserId(u.id)}
-                              >
-                                <div className="user-avatar">
-                                  <img
-                                    src={
-                                      u.profile_img ||
-                                      `https://ui-avatars.com/api/?name=${encodeURIComponent(abbreviatedName)}&background=6b7280&color=fff&size=128`
-                                    }
-                                    alt={abbreviatedName}
-                                  />
-                                  {u.is_admin && (
-                                    <span className="admin-badge">
-                                      Quản trị
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="user-name">
-                                  {abbreviatedName}
-                                </div>
-                                <div className="user-tooltip">
-                                  <div className="tooltip-row">
-                                    <span className="tooltip-label">
-                                      Họ và tên:
-                                    </span>
-                                    <span>{hoverName}</span>
-                                  </div>
-                                  <div className="tooltip-row">
-                                    <span className="tooltip-label">
-                                      Bộ phận:
-                                    </span>
-                                    <span>
-                                      {u.sub_department
-                                        ? `${u.sub_department} (${u.effective_bo_phan ?? u.bo_phan ?? "-"})`
-                                        : u.effective_bo_phan ||
-                                          u.bo_phan ||
-                                          "-"}
-                                    </span>
-                                  </div>
-                                  <div className="tooltip-row">
-                                    <span className="tooltip-label">
-                                      Chức vụ:
-                                    </span>
-                                    <span>
-                                      {u.position ||
-                                        (u.is_admin
-                                          ? "Quản trị viên"
-                                          : "Người dùng")}
-                                    </span>
-                                  </div>
-                                </div>
+                    return searchResults.map(
+                      ({ department, subDepartments }) => {
+                        const totalResults = subDepartments.reduce(
+                          (sum, sd) => sum + sd.users.length,
+                          0,
+                        );
+                        return (
+                          <div
+                            key={department.id}
+                            className="department-overview-card"
+                          >
+                            <div className="department-overview-header">
+                              <span className="department-overview-name">
+                                {department.name}
+                              </span>
+                              <span className="department-overview-count">
+                                {totalResults} kết quả
+                              </span>
+                            </div>
+                            <div className="overview-dropdown-content">
+                              <div className="overview-sub-sections">
+                                {subDepartments.map(
+                                  ({ subDepartment, users }) => (
+                                    <div
+                                      key={subDepartment.id}
+                                      className="overview-sub-section"
+                                    >
+                                      <div className="overview-sub-header">
+                                        <span>— {subDepartment.name}</span>
+                                        <span className="department-overview-sub-count">
+                                          {users.length} kết quả
+                                        </span>
+                                      </div>
+                                      <div className="user-grid overview-user-grid">
+                                        {users.map((u) => {
+                                          const abbreviatedName =
+                                            getAbbreviatedName(u);
+                                          return (
+                                            <div
+                                              key={u.id}
+                                              className="user-card"
+                                              onClick={() =>
+                                                setSelectedUserId(u.id)
+                                              }
+                                            >
+                                              <div className="user-avatar">
+                                                <img
+                                                  src={
+                                                    u.profile_img ||
+                                                    `https://ui-avatars.com/api/?name=${encodeURIComponent(abbreviatedName)}&background=6b7280&color=fff&size=128`
+                                                  }
+                                                  alt={abbreviatedName}
+                                                />
+                                                {u.is_admin && (
+                                                  <span className="admin-badge">
+                                                    Quản trị
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <div className="user-name">
+                                                {abbreviatedName}
+                                              </div>
+                                              {renderUserTooltip(
+                                                u,
+                                                subDepartment.id,
+                                              )}
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  ),
+                                )}
                               </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ));
+                            </div>
+                          </div>
+                        );
+                      },
+                    );
                   })()}
                 </div>
               ) : (
@@ -736,7 +863,6 @@ function App() {
                                             {subUsers.map((u) => {
                                               const abbreviatedName =
                                                 getAbbreviatedName(u);
-                                              const hoverName = getHoverName(u);
                                               return (
                                                 <div
                                                   key={u.id}
@@ -762,37 +888,7 @@ function App() {
                                                   <div className="user-name">
                                                     {abbreviatedName}
                                                   </div>
-                                                  <div className="user-tooltip">
-                                                    <div className="tooltip-row">
-                                                      <span className="tooltip-label">
-                                                        Họ và tên:
-                                                      </span>
-                                                      <span>{hoverName}</span>
-                                                    </div>
-                                                    <div className="tooltip-row">
-                                                      <span className="tooltip-label">
-                                                        Bộ phận:
-                                                      </span>
-                                                      <span>
-                                                        {u.sub_department
-                                                          ? `${u.sub_department} (${u.effective_bo_phan ?? u.bo_phan ?? "-"})`
-                                                          : u.effective_bo_phan ||
-                                                            u.bo_phan ||
-                                                            "-"}
-                                                      </span>
-                                                    </div>
-                                                    <div className="tooltip-row">
-                                                      <span className="tooltip-label">
-                                                        Chức vụ:
-                                                      </span>
-                                                      <span>
-                                                        {u.position ||
-                                                          (u.is_admin
-                                                            ? "Quản trị viên"
-                                                            : "Người dùng")}
-                                                      </span>
-                                                    </div>
-                                                  </div>
+                                                  {renderUserTooltip(u, sub.id)}
                                                 </div>
                                               );
                                             })}
@@ -808,97 +904,12 @@ function App() {
                                 </div>
                               )}
 
-                              {/* Direct department users (not in sub-departments) */}
-                              {(() => {
-                                const directUsers = deptUsers.filter(
-                                  (u) => !u.sub_department_id,
-                                );
-                                if (directUsers.length === 0 && !hasSubDepts) {
-                                  return (
-                                    <p className="overview-no-users">
-                                      Chưa có người dùng
-                                    </p>
-                                  );
-                                }
-                                if (directUsers.length === 0) return null;
-                                return (
-                                  <div className="overview-direct-users">
-                                    {hasSubDepts && (
-                                      <div className="overview-sub-header">
-                                        <span>— Trực thuộc bộ phận</span>
-                                        <span className="department-overview-sub-count">
-                                          {directUsers.length} người
-                                        </span>
-                                      </div>
-                                    )}
-                                    <div className="user-grid overview-user-grid">
-                                      {directUsers.map((u) => {
-                                        const abbreviatedName =
-                                          getAbbreviatedName(u);
-                                        const hoverName = getHoverName(u);
-                                        return (
-                                          <div
-                                            key={u.id}
-                                            className="user-card"
-                                            onClick={() =>
-                                              setSelectedUserId(u.id)
-                                            }
-                                          >
-                                            <div className="user-avatar">
-                                              <img
-                                                src={
-                                                  u.profile_img ||
-                                                  `https://ui-avatars.com/api/?name=${encodeURIComponent(abbreviatedName)}&background=6b7280&color=fff&size=128`
-                                                }
-                                                alt={abbreviatedName}
-                                              />
-                                              {u.is_admin && (
-                                                <span className="admin-badge">
-                                                  Quản trị
-                                                </span>
-                                              )}
-                                            </div>
-                                            <div className="user-name">
-                                              {abbreviatedName}
-                                            </div>
-                                            <div className="user-tooltip">
-                                              <div className="tooltip-row">
-                                                <span className="tooltip-label">
-                                                  Họ và tên:
-                                                </span>
-                                                <span>{hoverName}</span>
-                                              </div>
-                                              <div className="tooltip-row">
-                                                <span className="tooltip-label">
-                                                  Bộ phận:
-                                                </span>
-                                                <span>
-                                                  {u.sub_department
-                                                    ? `${u.sub_department} (${u.effective_bo_phan ?? u.bo_phan ?? "-"})`
-                                                    : u.effective_bo_phan ||
-                                                      u.bo_phan ||
-                                                      "-"}
-                                                </span>
-                                              </div>
-                                              <div className="tooltip-row">
-                                                <span className="tooltip-label">
-                                                  Chức vụ:
-                                                </span>
-                                                <span>
-                                                  {u.position ||
-                                                    (u.is_admin
-                                                      ? "Quản trị viên"
-                                                      : "Người dùng")}
-                                                </span>
-                                              </div>
-                                            </div>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                );
-                              })()}
+                              {/* Note: With many-to-many, there are no "direct" department users */}
+                              {!hasSubDepts && deptUsers.length === 0 && (
+                                <p className="overview-no-users">
+                                  Chưa có người dùng
+                                </p>
+                              )}
                             </div>
                           )}
                         </div>
@@ -955,7 +966,8 @@ function App() {
                 <div className="user-grid">
                   {filteredUsers.map((u) => {
                     const abbreviatedName = getAbbreviatedName(u);
-                    const hoverName = getHoverName(u);
+                    const subDeptId =
+                      selectedFilter?.type === "sub" ? selectedFilter.id : null;
                     return (
                       <div
                         key={u.id}
@@ -975,41 +987,7 @@ function App() {
                           )}
                         </div>
                         <div className="user-name">{abbreviatedName}</div>
-
-                        <div className="user-tooltip" style={{ zIndex: 9999 }}>
-                          <div className="tooltip-row">
-                            <span className="tooltip-label">Họ và tên:</span>
-                            <span>{hoverName}</span>
-                          </div>
-
-                          {user?.is_admin && (
-                            <div className="tooltip-row">
-                              <span className="tooltip-label">Email:</span>
-                              <span>{u.email || "-"}</span>
-                            </div>
-                          )}
-
-                          <div className="tooltip-row">
-                            <span className="tooltip-label">Bộ phận:</span>
-                            <span>
-                              {u.sub_department
-                                ? `${u.sub_department} (${u.effective_bo_phan ?? u.effective_department ?? u.department ?? u.bo_phan ?? "-"})`
-                                : u.effective_bo_phan ||
-                                  u.effective_department ||
-                                  u.department ||
-                                  u.bo_phan ||
-                                  "-"}
-                            </span>
-                          </div>
-
-                          <div className="tooltip-row">
-                            <span className="tooltip-label">Chức vụ:</span>
-                            <span>
-                              {u.position ||
-                                (u.is_admin ? "Quản trị viên" : "Người dùng")}
-                            </span>
-                          </div>
-                        </div>
+                        {renderUserTooltip(u, subDeptId)}
                       </div>
                     );
                   })}
