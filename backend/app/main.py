@@ -29,7 +29,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="AnhBi User Management API",
+    title="Metro Department Manager API",
     description="User management system with roles, relationships, and authentication",
     version="0.1.0",
     lifespan=lifespan,

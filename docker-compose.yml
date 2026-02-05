@@ -3,33 +3,33 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: anhbi-backend
+    container_name: metro-dept-backend
     ports:
       - "8000:8000"
     volumes:
-      - anhbi_db:/app/data
+      - metro_dept_db:/app/data
     environment:
-      - DATABASE_URL=sqlite:///./data/anhbi.db
+      - DATABASE_URL=sqlite:///./data/metro_dept.db
     networks:
-      - anhbi-network
+      - metro-dept-network
     restart: unless-stopped
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: anhbi-frontend
+    container_name: metro-dept-frontend
     ports:
       - "3000:80"
     depends_on:
       - backend
     networks:
-      - anhbi-network
+      - metro-dept-network
     restart: unless-stopped
 
 networks:
-  anhbi-network:
+  metro-dept-network:
     driver: bridge
 
 volumes:
-  anhbi_db:
+  metro_dept_db:

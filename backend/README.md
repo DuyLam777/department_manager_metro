@@ -1,4 +1,4 @@
-# AnhBi Backend
+# Metro Department Manager Backend
 
 User management backend with FastAPI, SQLite, and JWT authentication.
 

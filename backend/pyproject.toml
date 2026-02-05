@@ -1,5 +1,5 @@
 [project]
-name = "anhbi-backend"
+name = "metro-dept-backend"
 version = "0.1.0"
 description = "User management backend with FastAPI"
 readme = "README.md"
