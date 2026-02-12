@@ -155,7 +155,12 @@ function App() {
     try {
       let url = "/api/users";
       if (filter?.type === "department") {
-        url += `?department_id=${filter.id}`;
+        // For placeholder department, we need special handling to get unassigned users
+        if (filter.is_placeholder) {
+          url += `?sub_department_id=${filter.placeholder_sub_department_id}`;
+        } else {
+          url += `?department_id=${filter.id}`;
+        }
       } else if (filter?.type === "sub") {
         url += `?sub_department_id=${filter.id}`;
       }
@@ -561,34 +566,53 @@ function App() {
               const isDeptSelected =
                 selectedFilter?.type === "department" &&
                 selectedFilter?.id === dept.id;
+              
+              // For placeholder department, get placeholder sub-department ID
+              const placeholderSubDeptId = dept.is_placeholder && dept.sub_departments?.[0]?.id;
+              const isPlaceholderDept = dept.is_placeholder;
+              
               return (
                 <li key={`dept-${dept.id}`}>
                   <div
-                    className={`department-item department-dropdown-trigger ${hasSubDepts ? "has-children" : ""} ${isExpanded ? "expanded" : ""} ${isDeptSelected ? "active" : ""}`}
+                    className={`department-item ${!isPlaceholderDept && hasSubDepts ? "department-dropdown-trigger" : ""} ${!isPlaceholderDept && hasSubDepts ? "has-children" : ""} ${isExpanded ? "expanded" : ""} ${isDeptSelected ? "active" : ""}`}
                     onClick={() => {
-                      setSelectedFilter({
-                        type: "department",
-                        id: dept.id,
-                        name: dept.name,
-                        location: dept.location,
-                      });
-                      fetchUsersForFilter({
-                        type: "department",
-                        id: dept.id,
-                        name: dept.name,
-                      });
-                      if (hasSubDepts) {
-                        setExpandedDepartmentIds((prev) => {
-                          const next = new Set(prev);
-                          if (!next.has(dept.id)) next.add(dept.id);
-                          return next;
+                      if (isPlaceholderDept) {
+                        // For placeholder department, directly show unassigned users
+                        const filter = {
+                          type: "sub", // Use sub type to directly get users
+                          id: placeholderSubDeptId,
+                          name: dept.name,
+                          location: dept.location,
+                          is_placeholder_sub_dept: true,
+                        };
+                        setSelectedFilter(filter);
+                        fetchUsersForFilter(filter);
+                      } else {
+                        // For regular departments, normal behavior
+                        setSelectedFilter({
+                          type: "department",
+                          id: dept.id,
+                          name: dept.name,
+                          location: dept.location,
                         });
+                        fetchUsersForFilter({
+                          type: "department",
+                          id: dept.id,
+                          name: dept.name,
+                        });
+                        if (hasSubDepts) {
+                          setExpandedDepartmentIds((prev) => {
+                            const next = new Set(prev);
+                            if (!next.has(dept.id)) next.add(dept.id);
+                            return next;
+                          });
+                        }
                       }
                       setSidebarOpen(false);
                     }}
                   >
                     <span className="department-label">
-                      {hasSubDepts && (
+                      {!isPlaceholderDept && hasSubDepts && (
                         <span
                           className="department-chevron"
                           aria-hidden
@@ -612,7 +636,7 @@ function App() {
                     </span>
                     <span className="user-count">{dept.user_count ?? 0}</span>
                   </div>
-                  {hasSubDepts && (
+                  {!isPlaceholderDept && hasSubDepts && (
                     <ul
                       className={`sub-department-list ${isExpanded ? "is-open" : ""}`}
                     >
@@ -922,7 +946,9 @@ function App() {
             <>
               <div className="content-header">
                 <h1>
-                  {selectedFilter.location
+                  {selectedFilter.is_placeholder_sub_dept 
+                    ? "Người dùng chưa phân công"
+                    : selectedFilter.location
                     ? `${selectedFilter.name} - ${selectedFilter.location}`
                     : selectedFilter.name}
                 </h1>

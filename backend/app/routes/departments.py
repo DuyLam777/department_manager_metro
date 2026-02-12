@@ -35,10 +35,17 @@ class DepartmentReorderRequest(BaseModel):
 
 
 def _active_sub_departments(department) -> list:
-    """Sub-departments that are not deleted and not placeholder."""
-    return [
-        s for s in department.sub_departments if not s.deleted and not s.is_placeholder
-    ]
+    """Sub-departments that are not deleted and not placeholder (except for placeholder department)."""
+    if department.is_placeholder:
+        # For placeholder department, include placeholder sub-departments
+        return [s for s in department.sub_departments if not s.deleted]
+    else:
+        # For regular departments, exclude placeholder sub-departments
+        return [
+            s
+            for s in department.sub_departments
+            if not s.deleted and not s.is_placeholder
+        ]
 
 
 def _active_users_in_sub_department(sub_department) -> list:

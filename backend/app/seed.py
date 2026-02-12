@@ -197,20 +197,6 @@ def seed_data(db: Session):
         {
             "user": User(
                 username=None,
-                email="duc.nguyen@congty.vn",
-                first_name="Đức",
-                last_name="Nguyễn Tiến",
-                password_hash=None,
-                profile_img=avatar_url("Nguyen+Duc", "4f46e5"),
-                is_admin=False,
-            ),
-            "assignments": [
-                {"sub_department": backend, "position": "Trưởng nhóm Backend"},
-            ],
-        },
-        {
-            "user": User(
-                username=None,
                 email="long.tran@congty.vn",
                 first_name="Long",
                 last_name="Trần Hoàng",
@@ -531,6 +517,118 @@ def seed_data(db: Session):
                 {"sub_department": placeholder_sub, "position": None},
             ],
         },
+        {
+            "user": User(
+                username=None,
+                email="mai.pham@congty.vn",
+                first_name="Mai",
+                last_name="Phạm Thị",
+                password_hash=None,
+                profile_img=avatar_url("Pham+Mai", "6b7280"),
+                is_admin=False,
+            ),
+            "assignments": [
+                {"sub_department": placeholder_sub, "position": None},
+            ],
+        },
+        {
+            "user": User(
+                username=None,
+                email="tuan.le@congty.vn",
+                first_name="Tuấn",
+                last_name="Lê Anh",
+                password_hash=None,
+                profile_img=avatar_url("Le+Tuan", "6b7280"),
+                is_admin=False,
+            ),
+            "assignments": [
+                {"sub_department": placeholder_sub, "position": None},
+            ],
+        },
+        {
+            "user": User(
+                username=None,
+                email="hanh.vo@congty.vn",
+                first_name="Hạnh",
+                last_name="Võ Thị",
+                password_hash=None,
+                profile_img=avatar_url("Vo+Hanh", "6b7280"),
+                is_admin=False,
+            ),
+            "assignments": [
+                {"sub_department": placeholder_sub, "position": None},
+            ],
+        },
+        {
+            "user": User(
+                username=None,
+                email="son.nguyen2@congty.vn",
+                first_name="Sơn",
+                last_name="Nguyễn Quang",
+                password_hash=None,
+                profile_img=avatar_url("Nguyen+Son", "6b7280"),
+                is_admin=False,
+            ),
+            "assignments": [
+                {"sub_department": placeholder_sub, "position": None},
+            ],
+        },
+        {
+            "user": User(
+                username=None,
+                email="mai.pham@congty.vn",
+                first_name="Mai",
+                last_name="Phạm Thị",
+                password_hash=None,
+                profile_img=avatar_url("Pham+Mai", "6b7280"),
+                is_admin=False,
+            ),
+            "assignments": [
+                {"sub_department": placeholder_sub, "position": None},
+            ],
+        },
+        {
+            "user": User(
+                username=None,
+                email="tuan.le@congty.vn",
+                first_name="Tuấn",
+                last_name="Lê Anh",
+                password_hash=None,
+                profile_img=avatar_url("Le+Tuan", "6b7280"),
+                is_admin=False,
+            ),
+            "assignments": [
+                {"sub_department": placeholder_sub, "position": None},
+            ],
+        },
+        {
+            "user": User(
+                username=None,
+                email="hanh.vo@congty.vn",
+                first_name="Hạnh",
+                last_name="Võ Thị",
+                password_hash=None,
+                profile_img=avatar_url("Vo+Hanh", "6b7280"),
+                is_admin=False,
+            ),
+            "assignments": [
+                {"sub_department": placeholder_sub, "position": None},
+            ],
+        },
+        {
+            "user": User(
+                username=None,
+                email="son.nguyen2@congty.vn",
+                first_name="Sơn",
+                last_name="Nguyễn Quang",
+                password_hash=None,
+                profile_img=avatar_url("Nguyen+Son", "6b7280"),
+                is_admin=False,
+            ),
+            "assignments": [
+                {"sub_department": placeholder_sub, "position": None},
+            ],
+        },
     ]
 
     # Create users and their sub-department assignments
@@ -559,10 +657,10 @@ def seed_data(db: Session):
     print("  - Kỹ thuật: Phát triển Backend, Phát triển Frontend")
     print("  - Nhân sự: Tuyển dụng, Đào tạo")
     print("  - Kinh doanh: Bán hàng")
-    print("\nUsers (26 total):")
+    print("\nUsers (28 total):")
     print("  - 3 C-suite admins (in multiple sub-departments)")
-    print("  - 21 regular users (4-5 per sub-department)")
-    print("  - 2 unassigned users")
+    print("  - 20 regular users (4-5 per sub-department)")
+    print("  - 5 unassigned users")
     print("\nC-Suite Executives (in multiple sub-departments):")
     print("  1. Nguyễn Văn Minh - Tổng Giám đốc (CEO)")
     print("     → Backend, Tuyển dụng, Bán hàng")
