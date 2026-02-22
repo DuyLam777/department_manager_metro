@@ -49,6 +49,7 @@ def _sub_to_dict(sub: SubDepartment) -> dict:
         "department_name": sub.department.name if sub.department else None,
         "is_placeholder": sub.is_placeholder,
         "user_count": _active_users_count(sub),
+        "group_count": sum(1 for g in sub.groups if not g.deleted),
     }
 
 

@@ -11,10 +11,12 @@ export function DeletedItemsModal({
   onRestoreUser,
   onRestoreDepartment,
   onRestoreSubDepartment,
+  onRestoreGroup,
 }) {
   const [users, setUsers] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [subDepartments, setSubDepartments] = useState([]);
+  const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [actionLoading, setActionLoading] = useState(null);
@@ -23,26 +25,30 @@ export function DeletedItemsModal({
     setLoading(true);
     setError(null);
     try {
-      const [usersRes, deptsRes, subsRes] = await Promise.all([
+      const [usersRes, deptsRes, subsRes, groupsRes] = await Promise.all([
         fetch("/api/users/deleted/list", { headers: authHeaders(token) }),
         fetch("/api/departments/deleted/list", { headers: authHeaders(token) }),
         fetch("/api/sub-departments/deleted/list", {
           headers: authHeaders(token),
         }),
+        fetch("/api/groups/deleted/list", { headers: authHeaders(token) }),
       ]);
       if (!usersRes.ok)
         throw new Error("Tải danh sách người dùng đã xóa thất bại");
       if (!deptsRes.ok)
         throw new Error("Tải danh sách bộ phận đã xóa thất bại");
       if (!subsRes.ok) throw new Error("Tải danh sách Phòng đã xóa thất bại");
-      const [usersData, deptsData, subsData] = await Promise.all([
+      if (!groupsRes.ok) throw new Error("Tải danh sách Tổ đã xóa thất bại");
+      const [usersData, deptsData, subsData, groupsData] = await Promise.all([
         usersRes.json(),
         deptsRes.json(),
         subsRes.json(),
+        groupsRes.json(),
       ]);
       setUsers(usersData);
       setDepartments(deptsData);
       setSubDepartments(subsData);
+      setGroups(groupsData);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -188,6 +194,78 @@ export function DeletedItemsModal({
       setSubDepartments(subDepartments.filter((s) => s.id !== subId));
     } catch (err) {
       alert(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRestoreGroup = async (groupId, name) => {
+    if (!confirm(`Khôi phục tổ "${name}"?`)) return;
+    setActionLoading(`group-${groupId}`);
+    try {
+      const response = await fetch(`/api/groups/${groupId}/restore`, {
+        method: "POST",
+        headers: authHeaders(token),
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.detail || "Khôi phục tổ thất bại");
+      }
+      setGroups(groups.filter((g) => g.id !== groupId));
+      onRestoreGroup?.();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handlePermanentDeleteGroup = async (groupId, name) => {
+    if (
+      !confirm(
+        `Bạn có chắc muốn XÓA VĨNH VIỄN tổ "${name}"? Hành động này không thể phục hồi!`,
+      )
+    )
+      return;
+    setActionLoading(`group-${groupId}`);
+    try {
+      const response = await fetch(`/api/groups/${groupId}/permanent`, {
+        method: "DELETE",
+        headers: authHeaders(token),
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.detail || "Xóa tổ thất bại");
+      }
+      setGroups(groups.filter((g) => g.id !== groupId));
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleCleanupAllDeletedGroups = async () => {
+    if (
+      !confirm(
+        `Xóa vĩnh viễn tất cả ${groups.length} tổ đã xóa? Hành động này không thể phục hồi!`,
+      )
+    )
+      return;
+    setActionLoading("group-cleanup");
+    try {
+      await Promise.all(
+        groups.map((g) =>
+          fetch(`/api/groups/${g.id}/permanent`, {
+            method: "DELETE",
+            headers: authHeaders(token),
+          }),
+        ),
+      );
+      setGroups([]);
+    } catch (err) {
+      alert(err.message);
+      fetchDeletedItems();
     } finally {
       setActionLoading(null);
     }
@@ -450,6 +528,73 @@ export function DeletedItemsModal({
                             handlePermanentDeleteSubDepartment(s.id, s.name)
                           }
                           disabled={actionLoading === `sub-${s.id}`}
+                        >
+                          Xóa vĩnh viễn
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            {/* Deleted Groups section */}
+            <section className="deleted-section">
+              <div className="deleted-section-header">
+                <h3>Tổ đã xóa</h3>
+                <span className="deleted-section-count">
+                  {groups.length} tổ
+                </span>
+                <button
+                  type="button"
+                  className="btn-cleanup btn-cleanup-groups"
+                  onClick={handleCleanupAllDeletedGroups}
+                  disabled={
+                    actionLoading === "group-cleanup" || groups.length === 0
+                  }
+                >
+                  {actionLoading === "group-cleanup"
+                    ? "Đang xóa..."
+                    : "Xóa tất cả"}
+                </button>
+              </div>
+              {groups.length === 0 ? (
+                <p className="empty-text">Không có tổ đã xóa</p>
+              ) : (
+                <ul className="deleted-dept-list">
+                  {groups.map((g) => (
+                    <li key={g.id} className="deleted-dept-row">
+                      <div className="deleted-dept-info">
+                        <span className="deleted-dept-name deleted-group-name">
+                          ⸺ {g.name}
+                        </span>
+                        <span className="deleted-dept-desc deleted-group-breadcrumb">
+                          {[g.sub_department_name, g.department_name]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </span>
+                        <span className="deleted-dept-date">
+                          Đã xóa: {formatDate(g.deleted_at)}
+                        </span>
+                      </div>
+                      <div className="dept-actions">
+                        <button
+                          type="button"
+                          className="btn-restore"
+                          onClick={() => handleRestoreGroup(g.id, g.name)}
+                          disabled={actionLoading === `group-${g.id}`}
+                        >
+                          {actionLoading === `group-${g.id}`
+                            ? "..."
+                            : "Khôi phục"}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-perma-delete"
+                          onClick={() =>
+                            handlePermanentDeleteGroup(g.id, g.name)
+                          }
+                          disabled={actionLoading === `group-${g.id}`}
                         >
                           Xóa vĩnh viễn
                         </button>

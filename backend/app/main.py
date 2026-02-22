@@ -8,14 +8,16 @@ from app.domain.app_settings import (
     AppSettings,  # noqa: F401 - needed for table creation
 )
 from app.domain.department import Department  # noqa: F401 - needed for table creation
+from app.domain.group import Group  # noqa: F401 - needed for table creation
 from app.domain.sub_department import (
     SubDepartment,  # noqa: F401 - needed for table creation
 )
 from app.domain.user import User  # noqa: F401 - needed for table creation
+from app.domain.user_group import UserGroup  # noqa: F401 - needed for table creation
 from app.domain.user_sub_department import (
     UserSubDepartment,  # noqa: F401 - needed for table creation
 )
-from app.routes import auth, departments, settings, sub_departments, uploads, users
+from app.routes import auth, departments, groups, settings, sub_departments, uploads, users
 from app.seed import seed_data
 
 
@@ -52,6 +54,7 @@ app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(departments.router)
 app.include_router(sub_departments.router)
+app.include_router(groups.router)
 app.include_router(uploads.router)
 app.include_router(settings.router)
 

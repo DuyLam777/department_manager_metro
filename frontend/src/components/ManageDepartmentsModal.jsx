@@ -7,6 +7,7 @@ const API = "/api";
 export function ManageDepartmentsModal({ token, onClose, onSaved }) {
   const [departments, setDepartments] = useState([]);
   const [users, setUsers] = useState([]);
+  const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -16,9 +17,14 @@ export function ManageDepartmentsModal({ token, onClose, onSaved }) {
   const [editingDepartmentId, setEditingDepartmentId] = useState(null);
   const [addSubForDeptId, setAddSubForDeptId] = useState(null);
   const [editingSubId, setEditingSubId] = useState(null);
+  const [addGroupForSubId, setAddGroupForSubId] = useState(null);
+  const [editingGroupId, setEditingGroupId] = useState(null);
 
   // Selected unassigned user ids when adding to department
   const [selectedUserIdsToAdd, setSelectedUserIdsToAdd] = useState(new Set());
+  const [selectedGroupMemberIds, setSelectedGroupMemberIds] = useState(
+    new Set(),
+  );
 
   // Form values
   const [deptName, setDeptName] = useState("");
@@ -27,6 +33,8 @@ export function ManageDepartmentsModal({ token, onClose, onSaved }) {
   const [deptLocation, setDeptLocation] = useState("");
   const [subName, setSubName] = useState("");
   const [subDescription, setSubDescription] = useState("");
+  const [groupName, setGroupName] = useState("");
+  const [groupDescription, setGroupDescription] = useState("");
   const [subProfileImg, setSubProfileImg] = useState("");
   const [subLocation, setSubLocation] = useState("");
   const [subDepartmentId, setSubDepartmentId] = useState("");
@@ -37,18 +45,22 @@ export function ManageDepartmentsModal({ token, onClose, onSaved }) {
     setLoading(true);
     setError(null);
     try {
-      const [deptRes, usersRes] = await Promise.all([
+      const [deptRes, usersRes, groupsRes] = await Promise.all([
         fetch(`${API}/departments`),
         fetch(`${API}/users`),
+        fetch(`${API}/groups`),
       ]);
       if (!deptRes.ok) throw new Error("Tải bộ phận thất bại");
       if (!usersRes.ok) throw new Error("Tải người dùng thất bại");
-      const [deptData, usersData] = await Promise.all([
+      if (!groupsRes.ok) throw new Error("Tải tổ thất bại");
+      const [deptData, usersData, groupsData] = await Promise.all([
         deptRes.json(),
         usersRes.json(),
+        groupsRes.json(),
       ]);
       setDepartments(deptData);
       setUsers(usersData);
+      setGroups(groupsData);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -93,13 +105,18 @@ export function ManageDepartmentsModal({ token, onClose, onSaved }) {
     setEditingDepartmentId(null);
     setAddSubForDeptId(null);
     setEditingSubId(null);
+    setAddGroupForSubId(null);
+    setEditingGroupId(null);
     setSelectedUserIdsToAdd(new Set());
+    setSelectedGroupMemberIds(new Set());
     setDeptName("");
     setDeptDescription("");
     setDeptProfileImg("");
     setDeptLocation("");
     setSubName("");
     setSubDescription("");
+    setGroupName("");
+    setGroupDescription("");
     setSubProfileImg("");
     setSubLocation("");
     setSubDepartmentId("");
@@ -114,6 +131,14 @@ export function ManageDepartmentsModal({ token, onClose, onSaved }) {
     });
   };
 
+  const toggleGroupMember = (userId) => {
+    setSelectedGroupMemberIds((prev) => {
+      const next = new Set(prev);
+      next.has(userId) ? next.delete(userId) : next.add(userId);
+      return next;
+    });
+  };
+
   const handleClose = () => {
     resetForms();
     onClose();
@@ -123,6 +148,119 @@ export function ManageDepartmentsModal({ token, onClose, onSaved }) {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   });
+
+  const handleCreateGroup = async (e, subDeptId) => {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API}/groups`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({
+          name: groupName.trim(),
+          description: groupDescription.trim() || null,
+          sub_department_id: subDeptId,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.detail || "Tạo tổ thất bại");
+      }
+      const created = await res.json();
+      if (selectedGroupMemberIds.size > 0) {
+        const memberRes = await fetch(`${API}/groups/${created.id}/members`, {
+          method: "PUT",
+          headers: authHeaders(),
+          body: JSON.stringify({ user_ids: [...selectedGroupMemberIds] }),
+        });
+        if (!memberRes.ok) {
+          const data = await memberRes.json();
+          throw new Error(data.detail || "Thêm thành viên tổ thất bại");
+        }
+      }
+      await fetchDepartments();
+      onSaved?.();
+      resetForms();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleUpdateGroup = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API}/groups/${editingGroupId}`, {
+        method: "PUT",
+        headers: authHeaders(),
+        body: JSON.stringify({
+          name: groupName.trim(),
+          description: groupDescription.trim() || null,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.detail || "Cập nhật tổ thất bại");
+      }
+      const memberRes = await fetch(`${API}/groups/${editingGroupId}/members`, {
+        method: "PUT",
+        headers: authHeaders(),
+        body: JSON.stringify({ user_ids: [...selectedGroupMemberIds] }),
+      });
+      if (!memberRes.ok) {
+        const data = await memberRes.json();
+        throw new Error(data.detail || "Cập nhật thành viên tổ thất bại");
+      }
+      await fetchDepartments();
+      onSaved?.();
+      resetForms();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteGroup = async (group) => {
+    if (!window.confirm(`Xóa tổ "${group.name}"?`)) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API}/groups/${group.id}`, {
+        method: "DELETE",
+        headers: authHeaders(),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.detail || "Xóa tổ thất bại");
+      }
+      await fetchDepartments();
+      onSaved?.();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const startEditGroup = (group, subDeptUsers) => {
+    resetForms();
+    setEditingGroupId(group.id);
+    setGroupName(group.name);
+    setGroupDescription(group.description || "");
+    const currentMemberIds = new Set(
+      subDeptUsers
+        .filter((u) =>
+          (u.group_assignments || []).some((ga) => ga.group_id === group.id),
+        )
+        .map((u) => u.id),
+    );
+    setSelectedGroupMemberIds(currentMemberIds);
+  };
 
   const handleCreateDepartment = async (e) => {
     e.preventDefault();
@@ -1045,236 +1183,470 @@ export function ManageDepartmentsModal({ token, onClose, onSaved }) {
                     )}
 
                   <ul className="manage-sub-list">
-                    {(dept.sub_departments || []).map((sub) => (
-                      <li key={sub.id}>
-                        {editingSubId === sub.id ? (
-                          <div className="manage-sub-form-inline">
-                            <form onSubmit={handleUpdateSubDepartment}>
-                              <div className="form-group">
-                                <label>Tên *</label>
-                                <input
-                                  type="text"
-                                  value={subName}
-                                  onChange={(e) => setSubName(e.target.value)}
-                                  required
-                                />
-                              </div>
-                              <div className="form-group">
-                                <label>Mô tả</label>
-                                <input
-                                  type="text"
-                                  value={subDescription}
-                                  onChange={(e) =>
-                                    setSubDescription(e.target.value)
-                                  }
-                                />
-                              </div>
-                              <div className="form-group">
-                                <label>Vị trí</label>
-                                <input
-                                  type="text"
-                                  value={subLocation}
-                                  onChange={(e) =>
-                                    setSubLocation(e.target.value)
-                                  }
-                                  placeholder="VD: Tầng 3 - Phòng 301"
-                                />
-                              </div>
-                              <div className="form-group">
-                                <label>Hình ảnh</label>
-                                <div className="dept-img-upload">
-                                  {subProfileImg && (
-                                    <img
-                                      src={subProfileImg}
-                                      alt=""
-                                      className="dept-img-preview"
-                                    />
-                                  )}
-                                  <label className="btn-upload-img">
-                                    {subProfileImg ? "Thay đổi" : "Tải lên"}
-                                    <input
-                                      type="file"
-                                      accept="image/*"
-                                      className="profile-upload-input"
-                                      onChange={(e) =>
-                                        handleImageUpload(e, setSubProfileImg)
-                                      }
-                                    />
-                                  </label>
-                                  {subProfileImg && (
-                                    <button
-                                      type="button"
-                                      className="btn-remove-img"
-                                      onClick={() => setSubProfileImg("")}
-                                    >
-                                      Xóa
-                                    </button>
-                                  )}
+                    {(dept.sub_departments || []).map((sub) => {
+                      const subGroups = groups.filter(
+                        (g) => g.sub_department_id === sub.id,
+                      );
+                      const subDeptUsers = users.filter((u) =>
+                        (u.sub_department_assignments || []).some(
+                          (a) => a.sub_department_id === sub.id,
+                        ),
+                      );
+                      return (
+                        <li key={sub.id}>
+                          {editingSubId === sub.id ? (
+                            <div className="manage-sub-form-inline">
+                              <form onSubmit={handleUpdateSubDepartment}>
+                                <div className="form-group">
+                                  <label>Tên *</label>
+                                  <input
+                                    type="text"
+                                    value={subName}
+                                    onChange={(e) => setSubName(e.target.value)}
+                                    required
+                                  />
                                 </div>
-                              </div>
-                              <div className="form-group">
-                                <label>Bộ phận</label>
-                                <select
-                                  value={subDepartmentId}
-                                  onChange={(e) =>
-                                    setSubDepartmentId(e.target.value)
-                                  }
-                                >
-                                  {departments
-                                    .filter((d) => !d.is_placeholder)
-                                    .map((d) => (
-                                      <option key={d.id} value={d.id}>
-                                        {d.name}
-                                      </option>
-                                    ))}
-                                </select>
-                              </div>
-                              {!sub.is_placeholder &&
-                                (unassignedUsers.length > 0 ||
-                                  currentSubUsers.length > 0) && (
-                                  <div className="manage-dept-add-users">
-                                    <h4>
-                                      Gán người dùng vào {subName || sub.name}
-                                    </h4>
-                                    {unassignedUsers.length > 0 && (
-                                      <>
-                                        <p className="manage-dept-user-group-label">
-                                          Chưa phân công
-                                        </p>
-                                        <ul className="unassigned-users-list">
-                                          {unassignedUsers.map((u) => {
-                                            const displayName =
-                                              [u.first_name, u.last_name]
-                                                .filter(Boolean)
-                                                .join(" ") || u.username;
-                                            return (
-                                              <li key={u.id}>
-                                                <label className="unassigned-user-row">
-                                                  <input
-                                                    type="checkbox"
-                                                    checked={selectedUserIdsToAdd.has(
-                                                      u.id,
-                                                    )}
-                                                    onChange={() =>
-                                                      toggleUserToAdd(u.id)
-                                                    }
-                                                  />
-                                                  <span>
-                                                    {displayName}
-                                                    {displayName !==
-                                                      u.username && u.username
-                                                      ? ` (${u.username})`
-                                                      : ""}
-                                                  </span>
-                                                </label>
-                                              </li>
-                                            );
-                                          })}
-                                        </ul>
-                                      </>
+                                <div className="form-group">
+                                  <label>Mô tả</label>
+                                  <input
+                                    type="text"
+                                    value={subDescription}
+                                    onChange={(e) =>
+                                      setSubDescription(e.target.value)
+                                    }
+                                  />
+                                </div>
+                                <div className="form-group">
+                                  <label>Vị trí</label>
+                                  <input
+                                    type="text"
+                                    value={subLocation}
+                                    onChange={(e) =>
+                                      setSubLocation(e.target.value)
+                                    }
+                                    placeholder="VD: Tầng 3 - Phòng 301"
+                                  />
+                                </div>
+                                <div className="form-group">
+                                  <label>Hình ảnh</label>
+                                  <div className="dept-img-upload">
+                                    {subProfileImg && (
+                                      <img
+                                        src={subProfileImg}
+                                        alt=""
+                                        className="dept-img-preview"
+                                      />
                                     )}
-                                    {unassignedUsers.length > 0 &&
-                                      currentSubUsers.length > 0 && (
-                                        <div
-                                          className="manage-dept-user-separator"
-                                          aria-hidden="true"
-                                        />
-                                      )}
-                                    {currentSubUsers.length > 0 && (
-                                      <>
-                                        <p className="manage-dept-user-group-label">
-                                          Hiện đang trong {subName || sub.name}
-                                        </p>
-                                        <ul className="unassigned-users-list">
-                                          {currentSubUsers.map((u) => {
-                                            const displayName =
-                                              [u.first_name, u.last_name]
-                                                .filter(Boolean)
-                                                .join(" ") || u.username;
-                                            return (
-                                              <li key={u.id}>
-                                                <label className="unassigned-user-row">
-                                                  <input
-                                                    type="checkbox"
-                                                    checked={selectedUserIdsToAdd.has(
-                                                      u.id,
-                                                    )}
-                                                    onChange={() =>
-                                                      toggleUserToAdd(u.id)
-                                                    }
-                                                  />
-                                                  <span>
-                                                    {displayName}
-                                                    {displayName !==
-                                                      u.username && u.username
-                                                      ? ` (${u.username})`
-                                                      : ""}
-                                                  </span>
-                                                </label>
-                                              </li>
-                                            );
-                                          })}
-                                        </ul>
-                                      </>
+                                    <label className="btn-upload-img">
+                                      {subProfileImg ? "Thay đổi" : "Tải lên"}
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="profile-upload-input"
+                                        onChange={(e) =>
+                                          handleImageUpload(e, setSubProfileImg)
+                                        }
+                                      />
+                                    </label>
+                                    {subProfileImg && (
+                                      <button
+                                        type="button"
+                                        className="btn-remove-img"
+                                        onClick={() => setSubProfileImg("")}
+                                      >
+                                        Xóa
+                                      </button>
                                     )}
                                   </div>
+                                </div>
+                                <div className="form-group">
+                                  <label>Bộ phận</label>
+                                  <select
+                                    value={subDepartmentId}
+                                    onChange={(e) =>
+                                      setSubDepartmentId(e.target.value)
+                                    }
+                                  >
+                                    {departments
+                                      .filter((d) => !d.is_placeholder)
+                                      .map((d) => (
+                                        <option key={d.id} value={d.id}>
+                                          {d.name}
+                                        </option>
+                                      ))}
+                                  </select>
+                                </div>
+                                {!sub.is_placeholder &&
+                                  (unassignedUsers.length > 0 ||
+                                    currentSubUsers.length > 0) && (
+                                    <div className="manage-dept-add-users">
+                                      <h4>
+                                        Gán người dùng vào {subName || sub.name}
+                                      </h4>
+                                      {unassignedUsers.length > 0 && (
+                                        <>
+                                          <p className="manage-dept-user-group-label">
+                                            Chưa phân công
+                                          </p>
+                                          <ul className="unassigned-users-list">
+                                            {unassignedUsers.map((u) => {
+                                              const displayName =
+                                                [u.first_name, u.last_name]
+                                                  .filter(Boolean)
+                                                  .join(" ") || u.username;
+                                              return (
+                                                <li key={u.id}>
+                                                  <label className="unassigned-user-row">
+                                                    <input
+                                                      type="checkbox"
+                                                      checked={selectedUserIdsToAdd.has(
+                                                        u.id,
+                                                      )}
+                                                      onChange={() =>
+                                                        toggleUserToAdd(u.id)
+                                                      }
+                                                    />
+                                                    <span>
+                                                      {displayName}
+                                                      {displayName !==
+                                                        u.username && u.username
+                                                        ? ` (${u.username})`
+                                                        : ""}
+                                                    </span>
+                                                  </label>
+                                                </li>
+                                              );
+                                            })}
+                                          </ul>
+                                        </>
+                                      )}
+                                      {currentSubUsers.length > 0 && (
+                                        <>
+                                          <p className="manage-dept-user-group-label">
+                                            Hiện đang trong{" "}
+                                            {subName || sub.name}
+                                          </p>
+                                          <ul className="unassigned-users-list">
+                                            {currentSubUsers.map((u) => {
+                                              const displayName =
+                                                [u.first_name, u.last_name]
+                                                  .filter(Boolean)
+                                                  .join(" ") || u.username;
+                                              return (
+                                                <li key={u.id}>
+                                                  <label className="unassigned-user-row">
+                                                    <input
+                                                      type="checkbox"
+                                                      checked={selectedUserIdsToAdd.has(
+                                                        u.id,
+                                                      )}
+                                                      onChange={() =>
+                                                        toggleUserToAdd(u.id)
+                                                      }
+                                                    />
+                                                    <span>
+                                                      {displayName}
+                                                      {displayName !==
+                                                        u.username && u.username
+                                                        ? ` (${u.username})`
+                                                        : ""}
+                                                    </span>
+                                                  </label>
+                                                </li>
+                                              );
+                                            })}
+                                          </ul>
+                                        </>
+                                      )}
+                                    </div>
+                                  )}
+                                <div className="form-actions">
+                                  <button
+                                    type="button"
+                                    className="btn-cancel"
+                                    onClick={() => setEditingSubId(null)}
+                                  >
+                                    Hủy
+                                  </button>
+                                  <button
+                                    type="submit"
+                                    className="btn-save"
+                                    disabled={saving}
+                                  >
+                                    {saving ? "Đang lưu..." : "Lưu"}
+                                  </button>
+                                </div>
+                              </form>
+                            </div>
+                          ) : (
+                            <div className="manage-sub-row">
+                              <span className="manage-sub-name">
+                                — {sub.name}
+                                {sub.is_placeholder && (
+                                  <span className="placeholder-badge">
+                                    Chưa phân công
+                                  </span>
                                 )}
-                              <div className="form-actions">
-                                <button
-                                  type="button"
-                                  className="btn-cancel"
-                                  onClick={() => setEditingSubId(null)}
-                                >
-                                  Hủy
-                                </button>
-                                <button
-                                  type="submit"
-                                  className="btn-save"
-                                  disabled={saving}
-                                >
-                                  {saving ? "Đang lưu..." : "Lưu"}
-                                </button>
-                              </div>
-                            </form>
-                          </div>
-                        ) : (
-                          <div className="manage-sub-row">
-                            <span className="manage-sub-name">
-                              — {sub.name}
-                              {sub.is_placeholder && (
-                                <span className="placeholder-badge">
-                                  Chưa phân công
+                              </span>
+                              <span className="manage-sub-count">
+                                {sub.user_count} người
+                              </span>
+                              {isAdmin && !sub.is_placeholder && (
+                                <span className="manage-sub-actions">
+                                  <button
+                                    type="button"
+                                    className="btn-edit"
+                                    onClick={() => startEditSub(sub)}
+                                  >
+                                    Chỉnh sửa
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn-delete"
+                                    onClick={() =>
+                                      handleDeleteSubDepartment(sub, dept.name)
+                                    }
+                                    disabled={saving}
+                                  >
+                                    Xóa
+                                  </button>
                                 </span>
                               )}
-                            </span>
-                            <span className="manage-sub-count">
-                              {sub.user_count} người
-                            </span>
-                            {isAdmin && !sub.is_placeholder && (
-                              <span className="manage-sub-actions">
-                                <button
-                                  type="button"
-                                  className="btn-edit"
-                                  onClick={() => startEditSub(sub)}
-                                >
-                                  Chỉnh sửa
-                                </button>
-                                <button
-                                  type="button"
-                                  className="btn-delete"
-                                  onClick={() =>
-                                    handleDeleteSubDepartment(sub, dept.name)
-                                  }
-                                  disabled={saving}
-                                >
-                                  Xóa
-                                </button>
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </li>
-                    ))}
+                            </div>
+                          )}
+
+                          {!sub.is_placeholder && (
+                            <div className="manage-group-section">
+                              {addGroupForSubId === sub.id && (
+                                <div className="manage-group-form">
+                                  <form
+                                    onSubmit={(e) =>
+                                      handleCreateGroup(e, sub.id)
+                                    }
+                                  >
+                                    <div className="form-group">
+                                      <label>Tên tổ *</label>
+                                      <input
+                                        type="text"
+                                        value={groupName}
+                                        onChange={(e) =>
+                                          setGroupName(e.target.value)
+                                        }
+                                        required
+                                        autoFocus
+                                      />
+                                    </div>
+                                    <div className="form-group">
+                                      <label>Mô tả</label>
+                                      <input
+                                        type="text"
+                                        value={groupDescription}
+                                        onChange={(e) =>
+                                          setGroupDescription(e.target.value)
+                                        }
+                                      />
+                                    </div>
+                                    {subDeptUsers.length > 0 && (
+                                      <div className="form-group">
+                                        <label>Thành viên</label>
+                                        <ul className="unassigned-users-list">
+                                          {subDeptUsers.map((u) => {
+                                            const displayName =
+                                              [u.first_name, u.last_name]
+                                                .filter(Boolean)
+                                                .join(" ") || u.email;
+                                            return (
+                                              <li key={u.id}>
+                                                <label className="unassigned-user-row">
+                                                  <input
+                                                    type="checkbox"
+                                                    checked={selectedGroupMemberIds.has(
+                                                      u.id,
+                                                    )}
+                                                    onChange={() =>
+                                                      toggleGroupMember(u.id)
+                                                    }
+                                                  />
+                                                  <span>{displayName}</span>
+                                                </label>
+                                              </li>
+                                            );
+                                          })}
+                                        </ul>
+                                      </div>
+                                    )}
+                                    <div className="form-actions">
+                                      <button
+                                        type="button"
+                                        className="btn-cancel"
+                                        onClick={() =>
+                                          setAddGroupForSubId(null)
+                                        }
+                                      >
+                                        Hủy
+                                      </button>
+                                      <button
+                                        type="submit"
+                                        className="btn-save"
+                                        disabled={saving || !groupName.trim()}
+                                      >
+                                        {saving ? "Đang lưu..." : "Tạo tổ"}
+                                      </button>
+                                    </div>
+                                  </form>
+                                </div>
+                              )}
+
+                              {subGroups.length > 0 && (
+                                <ul className="manage-group-list">
+                                  {subGroups.map((group) => (
+                                    <li key={group.id}>
+                                      {editingGroupId === group.id ? (
+                                        <div className="manage-group-form-inline">
+                                          <form onSubmit={handleUpdateGroup}>
+                                            <div className="form-group">
+                                              <label>Tên tổ *</label>
+                                              <input
+                                                type="text"
+                                                value={groupName}
+                                                onChange={(e) =>
+                                                  setGroupName(e.target.value)
+                                                }
+                                                required
+                                                autoFocus
+                                              />
+                                            </div>
+                                            <div className="form-group">
+                                              <label>Mô tả</label>
+                                              <input
+                                                type="text"
+                                                value={groupDescription}
+                                                onChange={(e) =>
+                                                  setGroupDescription(
+                                                    e.target.value,
+                                                  )
+                                                }
+                                              />
+                                            </div>
+                                            {subDeptUsers.length > 0 && (
+                                              <div className="form-group">
+                                                <label>Thành viên</label>
+                                                <ul className="unassigned-users-list">
+                                                  {subDeptUsers.map((u) => {
+                                                    const displayName =
+                                                      [
+                                                        u.first_name,
+                                                        u.last_name,
+                                                      ]
+                                                        .filter(Boolean)
+                                                        .join(" ") || u.email;
+                                                    return (
+                                                      <li key={u.id}>
+                                                        <label className="unassigned-user-row">
+                                                          <input
+                                                            type="checkbox"
+                                                            checked={selectedGroupMemberIds.has(
+                                                              u.id,
+                                                            )}
+                                                            onChange={() =>
+                                                              toggleGroupMember(
+                                                                u.id,
+                                                              )
+                                                            }
+                                                          />
+                                                          <span>
+                                                            {displayName}
+                                                          </span>
+                                                        </label>
+                                                      </li>
+                                                    );
+                                                  })}
+                                                </ul>
+                                              </div>
+                                            )}
+                                            <div className="form-actions">
+                                              <button
+                                                type="button"
+                                                className="btn-cancel"
+                                                onClick={() =>
+                                                  setEditingGroupId(null)
+                                                }
+                                              >
+                                                Hủy
+                                              </button>
+                                              <button
+                                                type="submit"
+                                                className="btn-save"
+                                                disabled={
+                                                  saving || !groupName.trim()
+                                                }
+                                              >
+                                                {saving ? "Đang lưu..." : "Lưu"}
+                                              </button>
+                                            </div>
+                                          </form>
+                                        </div>
+                                      ) : (
+                                        <div className="manage-group-row">
+                                          <span className="manage-group-name">
+                                            ⸺ {group.name}
+                                          </span>
+                                          <span className="manage-group-count">
+                                            {group.user_count} người
+                                          </span>
+                                          {isAdmin && (
+                                            <span className="manage-group-actions">
+                                              <button
+                                                type="button"
+                                                className="btn-edit"
+                                                onClick={() =>
+                                                  startEditGroup(
+                                                    group,
+                                                    subDeptUsers,
+                                                  )
+                                                }
+                                              >
+                                                Chỉnh sửa
+                                              </button>
+                                              <button
+                                                type="button"
+                                                className="btn-delete"
+                                                onClick={() =>
+                                                  handleDeleteGroup(group)
+                                                }
+                                                disabled={saving}
+                                              >
+                                                Xóa
+                                              </button>
+                                            </span>
+                                          )}
+                                        </div>
+                                      )}
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+
+                              {isAdmin &&
+                                addGroupForSubId !== sub.id &&
+                                editingGroupId == null && (
+                                  <button
+                                    type="button"
+                                    className="btn-add-group"
+                                    onClick={() => {
+                                      resetForms();
+                                      setAddGroupForSubId(sub.id);
+                                      setSelectedGroupMemberIds(new Set());
+                                    }}
+                                  >
+                                    + Thêm tổ
+                                  </button>
+                                )}
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
                 {/* Drop indicator after */}

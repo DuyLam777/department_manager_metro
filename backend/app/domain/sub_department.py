@@ -31,6 +31,9 @@ class SubDepartment(Base):
         lazy="selectin",
     )
 
+    # One-to-many relationship with groups
+    groups = relationship("Group", back_populates="sub_department", lazy="selectin")
+
     @property
     def users(self):
         """Get all users assigned to this sub-department."""

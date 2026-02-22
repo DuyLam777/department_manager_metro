@@ -284,6 +284,24 @@
     cursor: not-allowed;
 }
 
+/* Deleted groups — indigo accent */
+.deleted-group-name {
+    color: #4338ca;
+}
+
+.deleted-group-breadcrumb {
+    font-size: 0.8rem;
+    color: #7c3aed;
+}
+
+.btn-cleanup-groups {
+    background-color: #6366f1;
+}
+
+.btn-cleanup-groups:hover:not(:disabled) {
+    background-color: #4f46e5;
+}
+
 /* Mobile Responsive */
 @media (max-width: 640px) {
     .deleted-items-modal {

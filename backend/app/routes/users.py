@@ -90,6 +90,24 @@ def user_to_dict(u: User, include_deleted_at: bool = False) -> dict:
                 primary_sub_dept_id = sub_dept.id
                 primary_position = assignment.position
 
+    group_memberships = []
+    for ga in u.group_assignments:
+        g = ga.group
+        if g and not g.deleted:
+            sub_dept = g.sub_department
+            group_memberships.append(
+                {
+                    "group_id": g.id,
+                    "group_name": g.name,
+                    "sub_department_id": g.sub_department_id,
+                    "sub_department_name": sub_dept.name if sub_dept else None,
+                    "department_id": sub_dept.department_id if sub_dept else None,
+                    "department_name": sub_dept.department.name
+                    if sub_dept and sub_dept.department
+                    else None,
+                }
+            )
+
     result = {
         "id": u.id,
         "username": u.username if u.is_admin else None,  # Only admins have username
@@ -100,6 +118,8 @@ def user_to_dict(u: User, include_deleted_at: bool = False) -> dict:
         "is_admin": u.is_admin,
         # All sub-department assignments with positions
         "sub_department_assignments": assignments,
+        # Group memberships
+        "group_assignments": group_memberships,
         # Primary/first assignment for backwards compatibility
         "bo_phan": primary_dept_name,
         "department_id": primary_dept_id,

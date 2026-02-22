@@ -1,7 +1,9 @@
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload, selectinload
 
+from app.domain.group import Group
 from app.domain.sub_department import SubDepartment
+from app.domain.user_group import UserGroup
 from app.domain.user import User
 from app.domain.user_sub_department import UserSubDepartment
 
@@ -12,6 +14,9 @@ def _user_query_options(q):
         selectinload(User.sub_department_assignments)
         .joinedload(UserSubDepartment.sub_department)
         .joinedload(SubDepartment.department),
+        selectinload(User.group_assignments)
+        .joinedload(UserGroup.group)
+        .joinedload(Group.sub_department),
     )
 
 

@@ -13,6 +13,7 @@ function App() {
   const { user, loading: authLoading, login, logout, getToken } = useAuth();
   const [departments, setDepartments] = useState([]);
   const [users, setUsers] = useState([]);
+  const [groups, setGroups] = useState([]);
   // { type: 'department', id, name } | { type: 'sub', id, name, departmentName } | null (all)
   const [selectedFilter, setSelectedFilter] = useState(null);
   // Department dropdowns: closed by default. Set of department ids that are expanded.
@@ -21,6 +22,8 @@ function App() {
   const [expandedOverviewDeptIds, setExpandedOverviewDeptIds] = useState(
     new Set(),
   );
+  // Sub-department ids whose group section is expanded in the overview
+  const [expandedGroupSubIds, setExpandedGroupSubIds] = useState(new Set());
   // All users for the overview search
   const [allUsers, setAllUsers] = useState([]);
   // Search query for the "All Departments" overview
@@ -109,6 +112,7 @@ function App() {
     fetchDepartments();
     fetchSettings();
     fetchAllUsers();
+    fetchGroups();
   }, []);
 
   const fetchAllUsers = async () => {
@@ -119,6 +123,17 @@ function App() {
       setAllUsers(data);
     } catch {
       // ignore - overview search will not work but app still functions
+    }
+  };
+
+  const fetchGroups = async () => {
+    try {
+      const res = await fetch("/api/groups");
+      if (!res.ok) return;
+      const data = await res.json();
+      setGroups(data);
+    } catch {
+      // ignore - groups will not show but app still functions
     }
   };
 
@@ -194,6 +209,7 @@ function App() {
   const fetchData = async () => {
     await fetchDepartments();
     await fetchAllUsers();
+    await fetchGroups();
     if (selectedFilter !== null) {
       await fetchUsersForFilter(selectedFilter);
     }
@@ -329,6 +345,65 @@ function App() {
       const assignments = u.sub_department_assignments || [];
       return assignments.some((a) => a.sub_department_id === subDeptId);
     });
+  };
+
+  // Get groups for a specific sub-department
+  const getGroupsForSubDepartment = (subDeptId) => {
+    return groups.filter((g) => g.sub_department_id === subDeptId);
+  };
+
+  // Get users who are members of a specific group
+  const getUsersForGroup = (groupId) => {
+    return allUsers.filter((u) =>
+      (u.group_assignments || []).some((ga) => ga.group_id === groupId),
+    );
+  };
+
+  // Render a group card used in the department/sub-department filter views
+  const renderGroupCard = (group) => {
+    const members = getUsersForGroup(group.id);
+    return (
+      <div key={group.id} className="group-card">
+        <div className="group-card-header">
+          <span className="group-card-name">{group.name}</span>
+          <span className="group-card-count">{group.user_count} người</span>
+        </div>
+        {group.description && (
+          <p className="group-card-desc">{group.description}</p>
+        )}
+        {members.length > 0 ? (
+          <div className="user-grid overview-user-grid">
+            {members.map((u) => {
+              const abbreviatedName = getAbbreviatedName(u);
+              return (
+                <div
+                  key={u.id}
+                  className="user-card"
+                  onClick={() => setSelectedUserId(u.id)}
+                >
+                  <div className="user-avatar">
+                    <img
+                      src={
+                        u.profile_img ||
+                        `https://ui-avatars.com/api/?name=${encodeURIComponent(abbreviatedName)}&background=6b7280&color=fff&size=128`
+                      }
+                      alt={abbreviatedName}
+                    />
+                    {u.is_admin && (
+                      <span className="admin-badge">Quản trị</span>
+                    )}
+                  </div>
+                  <div className="user-name">{abbreviatedName}</div>
+                  {renderUserTooltip(u, null)}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="overview-no-users">Chưa có thành viên</p>
+        )}
+      </div>
+    );
   };
 
   // Filter departments and users by overview search query
@@ -468,6 +543,7 @@ function App() {
           onRestoreUser={handleUserRestore}
           onRestoreDepartment={fetchDepartments}
           onRestoreSubDepartment={fetchDepartments}
+          onRestoreGroup={fetchGroups}
         />
       )}
 
@@ -566,11 +642,12 @@ function App() {
               const isDeptSelected =
                 selectedFilter?.type === "department" &&
                 selectedFilter?.id === dept.id;
-              
+
               // For placeholder department, get placeholder sub-department ID
-              const placeholderSubDeptId = dept.is_placeholder && dept.sub_departments?.[0]?.id;
+              const placeholderSubDeptId =
+                dept.is_placeholder && dept.sub_departments?.[0]?.id;
               const isPlaceholderDept = dept.is_placeholder;
-              
+
               return (
                 <li key={`dept-${dept.id}`}>
                   <div
@@ -871,6 +948,11 @@ function App() {
                                     const subUsers = getUsersForSubDepartment(
                                       sub.id,
                                     );
+                                    const subGroups = getGroupsForSubDepartment(
+                                      sub.id,
+                                    );
+                                    const isGroupsExpanded =
+                                      expandedGroupSubIds.has(sub.id);
                                     return (
                                       <div
                                         key={sub.id}
@@ -922,6 +1004,114 @@ function App() {
                                             Chưa có người dùng
                                           </p>
                                         )}
+
+                                        {/* Groups for this sub-department */}
+                                        {subGroups.length > 0 && (
+                                          <div className="overview-groups-section">
+                                            <div
+                                              className="overview-groups-header"
+                                              onClick={() =>
+                                                setExpandedGroupSubIds(
+                                                  (prev) => {
+                                                    const next = new Set(prev);
+                                                    next.has(sub.id)
+                                                      ? next.delete(sub.id)
+                                                      : next.add(sub.id);
+                                                    return next;
+                                                  },
+                                                )
+                                              }
+                                            >
+                                              <span className="overview-groups-toggle">
+                                                <span className="overview-chevron">
+                                                  {isGroupsExpanded ? "▼" : "▶"}
+                                                </span>
+                                                Tổ
+                                              </span>
+                                              <span className="overview-groups-count">
+                                                {subGroups.length} tổ
+                                              </span>
+                                            </div>
+                                            {isGroupsExpanded && (
+                                              <div className="overview-groups-list">
+                                                {subGroups.map((group) => {
+                                                  const groupMembers =
+                                                    getUsersForGroup(group.id);
+                                                  const abbrevName =
+                                                    getAbbreviatedName;
+                                                  return (
+                                                    <div
+                                                      key={group.id}
+                                                      className="overview-group-item"
+                                                    >
+                                                      <div className="overview-group-header">
+                                                        <span className="overview-group-name">
+                                                          ⸺ {group.name}
+                                                        </span>
+                                                        <span className="overview-group-count">
+                                                          {group.user_count}{" "}
+                                                          người
+                                                        </span>
+                                                      </div>
+                                                      {groupMembers.length >
+                                                      0 ? (
+                                                        <div className="user-grid overview-user-grid overview-group-grid">
+                                                          {groupMembers.map(
+                                                            (u) => {
+                                                              const abbreviatedName =
+                                                                abbrevName(u);
+                                                              return (
+                                                                <div
+                                                                  key={u.id}
+                                                                  className="user-card"
+                                                                  onClick={() =>
+                                                                    setSelectedUserId(
+                                                                      u.id,
+                                                                    )
+                                                                  }
+                                                                >
+                                                                  <div className="user-avatar">
+                                                                    <img
+                                                                      src={
+                                                                        u.profile_img ||
+                                                                        `https://ui-avatars.com/api/?name=${encodeURIComponent(abbreviatedName)}&background=6b7280&color=fff&size=128`
+                                                                      }
+                                                                      alt={
+                                                                        abbreviatedName
+                                                                      }
+                                                                    />
+                                                                    {u.is_admin && (
+                                                                      <span className="admin-badge">
+                                                                        Quản trị
+                                                                      </span>
+                                                                    )}
+                                                                  </div>
+                                                                  <div className="user-name">
+                                                                    {
+                                                                      abbreviatedName
+                                                                    }
+                                                                  </div>
+                                                                  {renderUserTooltip(
+                                                                    u,
+                                                                    null,
+                                                                  )}
+                                                                </div>
+                                                              );
+                                                            },
+                                                          )}
+                                                        </div>
+                                                      ) : (
+                                                        <p className="overview-no-users">
+                                                          Chưa có thành viên
+                                                        </p>
+                                                      )}
+                                                    </div>
+                                                  );
+                                                })}
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
                                       </div>
                                     );
                                   })}
@@ -946,11 +1136,11 @@ function App() {
             <>
               <div className="content-header">
                 <h1>
-                  {selectedFilter.is_placeholder_sub_dept 
+                  {selectedFilter.is_placeholder_sub_dept
                     ? "Người dùng chưa phân công"
                     : selectedFilter.location
-                    ? `${selectedFilter.name} - ${selectedFilter.location}`
-                    : selectedFilter.name}
+                      ? `${selectedFilter.name} - ${selectedFilter.location}`
+                      : selectedFilter.name}
                 </h1>
                 <div className="header-actions">
                   <div className="search-box">
@@ -1019,6 +1209,70 @@ function App() {
                   })}
                 </div>
               )}
+
+              {/* Groups section — department filter */}
+              {selectedFilter.type === "department" &&
+                !selectedFilter.is_placeholder_sub_dept &&
+                (() => {
+                  const dept = departments.find(
+                    (d) => d.id === selectedFilter.id,
+                  );
+                  if (!dept) return null;
+                  const subSections = (dept.sub_departments || [])
+                    .map((sub) => ({
+                      sub,
+                      subGroups: getGroupsForSubDepartment(sub.id),
+                    }))
+                    .filter(({ subGroups }) => subGroups.length > 0);
+                  if (subSections.length === 0) return null;
+                  const totalGroups = subSections.reduce(
+                    (sum, { subGroups }) => sum + subGroups.length,
+                    0,
+                  );
+                  return (
+                    <div className="groups-section">
+                      <div className="groups-section-header">
+                        <span>Tổ</span>
+                        <span className="groups-section-count">
+                          {totalGroups} tổ
+                        </span>
+                      </div>
+                      {subSections.map(({ sub, subGroups }) => (
+                        <div key={sub.id} className="groups-section-by-sub">
+                          <div className="groups-section-sub-label">
+                            — {sub.name}
+                          </div>
+                          <div className="groups-list">
+                            {subGroups.map((g) => renderGroupCard(g))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+
+              {/* Groups section — sub-department filter */}
+              {selectedFilter.type === "sub" &&
+                !selectedFilter.is_placeholder_sub_dept &&
+                (() => {
+                  const subGroups = getGroupsForSubDepartment(
+                    selectedFilter.id,
+                  );
+                  if (subGroups.length === 0) return null;
+                  return (
+                    <div className="groups-section">
+                      <div className="groups-section-header">
+                        <span>Tổ</span>
+                        <span className="groups-section-count">
+                          {subGroups.length} tổ
+                        </span>
+                      </div>
+                      <div className="groups-list">
+                        {subGroups.map((g) => renderGroupCard(g))}
+                      </div>
+                    </div>
+                  );
+                })()}
             </>
           )}
         </main>

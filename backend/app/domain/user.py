@@ -30,11 +30,26 @@ class User(Base):
         lazy="selectin",
     )
 
+    # Many-to-many relationship with groups through UserGroup
+    group_assignments = relationship(
+        "UserGroup",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
     @property
     def sub_departments(self):
         """Get all sub-departments this user belongs to."""
         return [
             assignment.sub_department for assignment in self.sub_department_assignments
+        ]
+
+    @property
+    def groups(self):
+        """Get all non-deleted groups this user belongs to."""
+        return [
+            a.group for a in self.group_assignments if a.group and not a.group.deleted
         ]
 
     @property
