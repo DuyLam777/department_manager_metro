@@ -798,7 +798,7 @@ function App() {
                       className="btn-add-user"
                       onClick={() => setShowAddUserModal(true)}
                     >
-                      + Thêm người dùng
+                      + Thêm nhân viên
                     </button>
                   )}
                 </div>
@@ -1166,7 +1166,7 @@ function App() {
                       className="btn-add-user"
                       onClick={() => setShowAddUserModal(true)}
                     >
-                      + Thêm người dùng
+                      + Thêm nhân viên
                     </button>
                   )}
                 </div>

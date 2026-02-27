@@ -211,11 +211,24 @@ def create_user(request: UserCreateRequest, db: Session = Depends(get_db)):
     db.flush()  # Get user ID
 
     # Create sub-department assignments
-    for assignment in request.sub_department_assignments:
+    if request.sub_department_assignments:
+        for assignment in request.sub_department_assignments:
+            user_sub_dept = UserSubDepartment(
+                user_id=user.id,
+                sub_department_id=assignment.sub_department_id,
+                position=assignment.position,
+            )
+            db.add(user_sub_dept)
+    else:
+        placeholder_sub = department_repo.get_placeholder_sub_department(db)
+        if not placeholder_sub:
+            raise HTTPException(
+                status_code=500, detail="Placeholder sub-department not found"
+            )
         user_sub_dept = UserSubDepartment(
             user_id=user.id,
-            sub_department_id=assignment.sub_department_id,
-            position=assignment.position,
+            sub_department_id=placeholder_sub.id,
+            position=None,
         )
         db.add(user_sub_dept)
 
@@ -380,9 +393,7 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Prevent deleting admin users
-    if user.is_admin:
-        raise HTTPException(status_code=400, detail="Cannot delete admin users")
+    # Admins can delete any user, including other admins and themselves
 
     # Soft delete with timestamp
     user.deleted = True

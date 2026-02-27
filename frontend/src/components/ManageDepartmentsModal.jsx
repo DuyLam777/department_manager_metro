@@ -1116,7 +1116,7 @@ export function ManageDepartmentsModal({ token, onClose, onSaved }) {
                         </div>
                         {unassignedUsers.length > 0 && (
                           <div className="manage-dept-add-users">
-                            <h4>Thêm người dùng từ Chưa phân công</h4>
+                            <h4>Thêm nhân viên từ Chưa phân công</h4>
                             <ul className="unassigned-users-list">
                               {unassignedUsers.map((u) => {
                                 const displayName =

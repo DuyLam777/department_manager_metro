@@ -643,7 +643,7 @@ export function UserDetailModal({
           </div>
         )}
 
-        {isAdmin && !user?.is_admin && (
+        {isAdmin && (
           <div className="danger-zone">
             <label>Khu vực nguy hiểm</label>
             <button

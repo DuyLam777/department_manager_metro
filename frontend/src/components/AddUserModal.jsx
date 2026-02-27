@@ -237,7 +237,7 @@ export function AddUserModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="add-user-modal-header">
-          <h2>Thêm người dùng mới</h2>
+          <h2>Thêm nhân viên mới</h2>
           <button
             type="button"
             className="add-user-close-btn"
