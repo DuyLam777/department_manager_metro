@@ -192,6 +192,7 @@ def permanent_delete_department(
     _admin=Depends(require_admin),
 ):
     """Permanently delete a soft-deleted department. Admin only. Cannot delete placeholder."""
+
     dept = (
         db.query(Department)
         .filter(
@@ -200,14 +201,31 @@ def permanent_delete_department(
         )
         .first()
     )
+
     if not dept:
         raise HTTPException(status_code=404, detail="Bộ phận đã xóa không tìm thấy")
+
     if dept.is_placeholder:
         raise HTTPException(
             status_code=400, detail="Không thể xóa vĩnh viễn bộ phận 'Chưa phân công'"
         )
+
+    # Permanently remove child sub-departments, their groups, and memberships to avoid FK issues
+    for sub in list(dept.sub_departments):
+        # Remove group memberships and groups under each sub-department
+        for g in list(sub.groups):
+            for ga in list(g.user_assignments):
+                db.delete(ga)
+            db.delete(g)
+        # Remove any remaining user assignments to this sub-department
+        for assignment in list(sub.user_assignments):
+            db.delete(assignment)
+        # Finally remove the sub-department itself
+        db.delete(sub)
+
     db.delete(dept)
     db.commit()
+
     return {"message": "Bộ phận đã được xóa vĩnh viễn"}
 
 

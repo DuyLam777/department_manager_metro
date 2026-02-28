@@ -5,7 +5,9 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.config.database import get_db
+from app.domain.group import Group
 from app.domain.sub_department import SubDepartment
+from app.domain.user_group import UserGroup
 from app.domain.user_sub_department import UserSubDepartment
 from app.repo import department_repo, sub_department_repo
 from app.routes.auth import require_admin
@@ -127,6 +129,7 @@ def permanent_delete_sub_department(
     _admin=Depends(require_admin),
 ):
     """Permanently delete a soft-deleted sub_department. Admin only. Cannot delete placeholder."""
+
     sub = (
         db.query(SubDepartment)
         .filter(
@@ -135,20 +138,39 @@ def permanent_delete_sub_department(
         )
         .first()
     )
+
     if not sub:
         raise HTTPException(status_code=404, detail="Phòng đã xóa không tìm thấy")
+
     if sub.is_placeholder:
         raise HTTPException(
             status_code=400, detail="Không thể xóa vĩnh viễn Phòng placeholder"
         )
 
     # Delete any remaining user assignments to this sub-department
+
     db.query(UserSubDepartment).filter(
         UserSubDepartment.sub_department_id == sub_department_id
     ).delete()
 
+    # Delete groups under this sub-department and their memberships to avoid FK violations
+    group_ids = [
+        gid
+        for (gid,) in db.query(Group.id)
+        .filter(Group.sub_department_id == sub_department_id)
+        .all()
+    ]
+    if group_ids:
+        db.query(UserGroup).filter(UserGroup.group_id.in_(group_ids)).delete(
+            synchronize_session=False
+        )
+        db.query(Group).filter(Group.id.in_(group_ids)).delete(
+            synchronize_session=False
+        )
+
     db.delete(sub)
     db.commit()
+
     return {"message": "Phòng đã được xóa vĩnh viễn"}
 
 

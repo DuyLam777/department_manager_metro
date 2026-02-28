@@ -135,12 +135,38 @@ export function DeletedItemsModal({
     try {
       const response = await fetch(`/api/users/${userId}/permanent`, {
         method: "DELETE",
+
         headers: authHeaders(token),
       });
+
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.detail || "Xóa người dùng thất bại");
+        let message = "Xóa người dùng thất bại";
+
+        try {
+          const data = await response.clone().json();
+
+          message = data?.detail || message;
+        } catch (e) {
+          console.warn(
+            "Failed to parse JSON error response for permanent delete user",
+            e,
+          );
+
+          try {
+            const text = await response.text();
+
+            if (text) message = text;
+          } catch (e2) {
+            console.warn(
+              "Failed to read error text for permanent delete user",
+              e2,
+            );
+          }
+        }
+
+        throw new Error(message);
       }
+
       setUsers(users.filter((u) => u.id !== userId));
     } catch (err) {
       alert(err.message);
@@ -160,13 +186,42 @@ export function DeletedItemsModal({
     try {
       const response = await fetch(`/api/departments/${deptId}/permanent`, {
         method: "DELETE",
+
         headers: authHeaders(token),
       });
+
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.detail || "Xóa bộ phận thất bại");
+        let message = "Xóa bộ phận thất bại";
+
+        try {
+          const data = await response.clone().json();
+
+          message = data?.detail || message;
+        } catch (e) {
+          console.warn(
+            "Failed to parse JSON error response for permanent delete department",
+            e,
+          );
+
+          try {
+            const text = await response.text();
+
+            if (text) message = text;
+          } catch (e2) {
+            console.warn(
+              "Failed to read error text for permanent delete department",
+              e2,
+            );
+          }
+        }
+
+        throw new Error(message);
       }
+
       setDepartments(departments.filter((d) => d.id !== deptId));
+      setSubDepartments(
+        subDepartments.filter((s) => s.department_id !== deptId),
+      );
     } catch (err) {
       alert(err.message);
     } finally {
@@ -185,12 +240,38 @@ export function DeletedItemsModal({
     try {
       const response = await fetch(`/api/sub-departments/${subId}/permanent`, {
         method: "DELETE",
+
         headers: authHeaders(token),
       });
+
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.detail || "Xóa Phòng thất bại");
+        let message = "Xóa Phòng thất bại";
+
+        try {
+          const data = await response.clone().json();
+
+          message = data?.detail || message;
+        } catch (e) {
+          console.warn(
+            "Failed to parse JSON error response for permanent delete sub-department",
+            e,
+          );
+
+          try {
+            const text = await response.text();
+
+            if (text) message = text;
+          } catch (e2) {
+            console.warn(
+              "Failed to read error text for permanent delete sub-department",
+              e2,
+            );
+          }
+        }
+
+        throw new Error(message);
       }
+
       setSubDepartments(subDepartments.filter((s) => s.id !== subId));
     } catch (err) {
       alert(err.message);
@@ -231,12 +312,38 @@ export function DeletedItemsModal({
     try {
       const response = await fetch(`/api/groups/${groupId}/permanent`, {
         method: "DELETE",
+
         headers: authHeaders(token),
       });
+
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.detail || "Xóa tổ thất bại");
+        let message = "Xóa tổ thất bại";
+
+        try {
+          const data = await response.clone().json();
+
+          message = data?.detail || message;
+        } catch (e) {
+          console.warn(
+            "Failed to parse JSON error response for permanent delete group",
+            e,
+          );
+
+          try {
+            const text = await response.text();
+
+            if (text) message = text;
+          } catch (e2) {
+            console.warn(
+              "Failed to read error text for permanent delete group",
+              e2,
+            );
+          }
+        }
+
+        throw new Error(message);
       }
+
       setGroups(groups.filter((g) => g.id !== groupId));
     } catch (err) {
       alert(err.message);
