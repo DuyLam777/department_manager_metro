@@ -228,7 +228,6 @@ def permanent_delete_department(
 
     return {"message": "Bộ phận đã được xóa vĩnh viễn"}
 
-
 @router.get("/{department_id}")
 def get_department(department_id: int, db: Session = Depends(get_db)):
     """Get a single department by ID. Read-only for all."""

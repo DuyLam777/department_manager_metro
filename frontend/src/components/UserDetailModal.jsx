@@ -170,45 +170,84 @@ export function UserDetailModal({
 
   const handleSave = async () => {
     setSaving(true);
+
     setError(null);
+
     try {
       // Build sub_department_assignments array
+
       const subDeptAssignments = assignments
+
         .filter((a) => a.sub_department_id)
+
         .map((a) => ({
           sub_department_id: a.sub_department_id,
+
           position: a.position || null,
         }));
 
-      const updateData = {
-        email: email || null,
-        first_name: firstName || null,
-        last_name: lastName || null,
-        profile_img: profileImg || null,
-        sub_department_assignments: subDeptAssignments,
-      };
+      const subDeptAssignmentsJson = JSON.stringify(subDeptAssignments);
+
+      // Build payload with only changed fields
+      const updateData = {};
+
+      if (!originalValues || email !== originalValues.email) {
+        updateData.email = email || null;
+      }
+      if (!originalValues || firstName !== originalValues.firstName) {
+        updateData.first_name = firstName || null;
+      }
+      if (!originalValues || lastName !== originalValues.lastName) {
+        updateData.last_name = lastName || null;
+      }
+      if (!originalValues || profileImg !== originalValues.profileImg) {
+        updateData.profile_img = profileImg || null;
+      }
+      if (
+        !originalValues ||
+        originalValues.assignments !== subDeptAssignmentsJson
+      ) {
+        updateData.sub_department_assignments = subDeptAssignments;
+      }
 
       // Only update username for admin users (they're the only ones with usernames)
-      if (user?.is_admin) {
+
+      if (
+        user?.is_admin &&
+        (!originalValues || username !== originalValues.username)
+      ) {
         updateData.username = username;
+      }
+
+      // No-op if nothing changed
+      if (Object.keys(updateData).length === 0) {
+        setSaving(false);
+        onClose();
+        return;
       }
 
       const response = await fetch(`/api/users/${userId}`, {
         method: "PUT",
+
         headers: {
           "Content-Type": "application/json",
+
           Authorization: `Bearer ${token}`,
         },
+
         body: JSON.stringify(updateData),
       });
 
       if (!response.ok) {
         const data = await response.json();
+
         throw new Error(data.detail || "Cập nhật người dùng thất bại");
       }
 
       const updatedUser = await response.json();
+
       onUpdate(updatedUser);
+
       onClose();
     } catch (err) {
       setError(err.message);
